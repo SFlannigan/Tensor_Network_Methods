@@ -54,6 +54,8 @@ classdef mps_cpn
         % Vector containing Suzuki-Trotter time steps
         ST_Order
         
+        % Vector containing exponential roots. Used with Runga-Kutta
+        RK_Roots
         
         % Matrix Containing [lattice position,Number of applications] to 
         % implement SWAP gates
@@ -1639,6 +1641,95 @@ classdef mps_cpn
                 end
                 W_TEBD(n)=W;
             end
+        end
+        
+        function mps_cpn = Set_Runga_Kutta_Order(mps_cpn,order)
+            % Set the roots of exp(-i*dt*H). Used in the Runga-Kutta MPO
+            % time evolution
+            
+            % coefficients of exp(x) in the reversed order
+            p=1./factorial(order-1:-1:0);
+            % roots
+            mps_cpn.RK_Roots=roots(p);
+            
+        end
+        
+        function [mps_cpn,Total_error] = Runga_Kutta_Time_Evolve(mps_cpn,H,dt)
+            % Runga-Kutta time evolution. Advance the MPS by one time step
+            % with the operator exp(-1*dt*H).
+            %
+            % [1] - Juan Jos» GarcÃa-Ripoll, 'Time evolution of Matrix 
+            % Product States' IOP, (2006)
+            
+            order = size(mps_cpn.RK_Roots,2);
+            
+            Total_error=0;
+            for c = 1:(order-1)
+                H=H.Eff_Time_Evolve(dt,mps_cpn.RK_Roots(c));
+                
+                mps_cpn = mps_cpn.Apply_MPO(H);
+                
+                [mps_cpn,error] = Canonicalisation_2s(mps_cpn,'L-R');
+                Total_error=Total_error+error;
+            end
+        end
+        
+        function mps_cpn = Apply_MPO(mps_cpn,H)
+            % Apply the MPO H to the MPS
+            
+            M = size(mps_cpn.data,2);
+            
+            for m = 1:M
+                [alpha,beta]=size(H.data{m});
+                Store = cell(alpha,beta);
+                
+                for a_count = 1:alpha
+                    for b_count = 1:beta
+                        if H.data{m}==0
+                            Store{a_count,b_count}=0*mps_cpn.data{m};
+                        elseif H.data{m}==1
+                            Store{a_count,b_count}=mps_cpn.data{m};
+                        else
+                            [a,g] = size(mps_cpn.data{m});
+                            [kappa,gamma] = size(mps_cpn.data{m}{end,1});
+                            Nl = min((mps_cpn.d-1)*(site1-1)+1,mps_cpn.N+1);
+                            
+                            temp = cell(a,g);
+                            temp(cellfun(@isempty,temp)) = {zeros(kappa,gamma)};
+                            for l = 1:mps_cpn.d
+                                for N_R = max(1,(g-Nl-l+2)):max(1,min(g,mps_cpn.N+1-l+1))
+                                    for count2 = (-mps_cpn.d+l):(l-1)
+                                        temp{l-count2,N_R} = temp{l-count2,N_R}+mps_cpn.b(l-count2,l)*O{site1}{l,N_R};
+                                    end
+                                end
+                            end
+                            
+                            if mpo_cpn.N_track{m}{beta}==1
+                                m_temp = cell(a,g);
+                                for m1 = 2:m_g
+                                    m_temp(:,m1) = temp(:,m1-1);
+                                end
+                                m_temp(cellfun(@isempty,m_temp)) = {zeros(size(kappa,gamma))};
+                                temp = m_temp;
+                            elseif mpo_cpn.N_track{m}{beta}==-1
+                                m_temp = cell(a,g);
+                                for m1 = 1:m_g-1
+                                    m_temp(:,m1) = temp(:,m1+1);
+                                end
+                                m_temp(cellfun(@isempty,m_temp)) = {zeros(size(kappa,gamma))};
+                                temp=m_temp;
+                            end
+                            
+                            Store{a_count,b_count}=temp;
+                        end
+                        
+                    end
+                end
+                
+                
+                
+            end
+            
         end
         
         % I attempted to implement a routine that would allow a general 
