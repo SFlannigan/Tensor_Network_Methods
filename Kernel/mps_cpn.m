@@ -11,7 +11,6 @@ classdef mps_cpn
     %       time evolution procedures in the new formalism. I think I
     %       should produce a set of notes that goes into the details.
     %
-    %       Y-Junction
 
     
     
