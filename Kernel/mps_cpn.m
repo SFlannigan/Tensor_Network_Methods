@@ -325,6 +325,9 @@ classdef mps_cpn
                 
                 id = eye(mps_cpn.d^2);
                 
+                % !!! This should be vectorized, i.e. written with as few for-loops
+                % as possible. Currently, it is the bottleneck of your code.
+                % In order for me to understand it we need to discuss.
                 track=1;
                 for gamma = (mps_cpn.N+1-g_1+1):Nl_2
                     for d_1 = 1:d_1_s(gamma)
@@ -471,6 +474,9 @@ classdef mps_cpn
             % Function used to calculate normalisation of two site MPS
             % tensor.
             % Used by 'Canonicalisation_2s' and 'Time_Evolve'.
+            %
+            % !!! Create a directory with useful extra functions and put
+            % this one there. This function does not even use mps_cpn.
             
             if ~isempty(x)
                 x = sum(diag(x'*x));
@@ -482,6 +488,9 @@ classdef mps_cpn
             % Function used to resize MPS
             % tensor.
             % Used by 'Canonicalisation_2s' and 'Time_Evolve'.
+            %
+            % !!! Create a directory with useful extra functions and put
+            % this one there. This function does not even use mps_cpn.
             
             
             [a,b]= size(X);
@@ -646,13 +655,18 @@ classdef mps_cpn
             % Set vecotr containing Suzuki-Trotter time steps for TEBD time
             % evolution
             if order ==  4
+                % !!! You should also mark in which direction you go. Look
+                % at Eqs. (6.43)-(6.45) in Johannes's PhD
                 mps_cpn.ST_Order = [1/12,1/12,1/12,-1/6,1/12,0,1/12,0,1/12,0,1/12,1/12,1/12,1/12,0,1/12,0,1/12,0,1/12,-1/6,1/12,1/12,1/12];
             end
         end
         
         function H_2s = Loc_2s_Ham(mps_cpn,M,J,U,E)
             % Generate 2-site local Hamiltonian for TEBD algorithm.
-
+            %
+            % !!! Functions like this should not necesseraly be inside of
+            % the class, because you are not operating with the class object
+            % at all here. It's just a suggestion. 
             H_2s = cell(1,M-1);
             
             num = mps_cpn.b_dag*mps_cpn.b;
@@ -782,6 +796,10 @@ classdef mps_cpn
             d_2_s = (mps_cpn.N+1):-1:1;
             d_2_s(d_2_s>mps_cpn.d)=mps_cpn.d;
             
+            % Make temp as a matrix!!!
+            % Use cells only when you do not know the exact sizes of the
+            % object. Everything below can be rewritten with matrix
+            % multiplications, i.e. it will be a gazilion time faster.
             temp = cell(a_1*a_2,length((1+mps_cpn.N+1-g_1):Nl_2));
             track=1;
             for gamma = (1+mps_cpn.N+1-g_1):Nl_2
@@ -791,6 +809,9 @@ classdef mps_cpn
                 track=track+1;
             end
             
+            % !!! This should be vectorized, i.e. written with as few for-loops
+            % as possible. Currently, it is the bottleneck of your code.
+            % In order for me to understand it we need to discuss.
             track=1;
             for gamma = (mps_cpn.N+1-g_1+1):Nl_2
                 for d_1 = 1:d_1_s(gamma)
@@ -1379,6 +1400,9 @@ classdef mps_cpn
             % Either plots a 1D graph of the particle number distribution,
             % or a 2D surf plot of the site-site correlation function
             % depending on the dimension of the input matrix.
+            %
+            % !!! Create a directory with useful extra functions and put
+            % this one there. This function does not even use mps_cpn.
             
             M = max(size(Corr));
             dim = sum(size(Corr)>1);
@@ -1409,6 +1433,9 @@ classdef mps_cpn
             % Either plots a 1D graph of the particle number distribution,
             % or a 2D surf plot of the site-site correlation function
             % depending on the dimension of the input matrix.
+            %
+            % !!! Create a directory with useful extra functions and put
+            % this one there. This function does not even use mps_cpn.
             
             M = max(size(Corr));
             dim = sum(size(Corr)>1);
