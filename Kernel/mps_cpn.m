@@ -1658,7 +1658,7 @@ classdef mps_cpn
             % Runga-Kutta time evolution. Advance the MPS by one time step
             % with the operator exp(-1*dt*H).
             %
-            % [1] - Juan Jos» GarcÃa-Ripoll, 'Time evolution of Matrix 
+            % [1] - Juan Jose Garcia-Ripoll, 'Time evolution of Matrix 
             % Product States' IOP, (2006)
             
             order = size(mps_cpn.RK_Roots,2);
