@@ -31,6 +31,10 @@ classdef mps_cpn
         % the local dimension and the other is the number of particles to
         % the right (or left).
         %
+        % !!! but you do not say anything below on how you change this
+        % second dimension, i.e. when it count particle to the left and
+        % when to the right. I assume you always count them to the right.
+        %
         % 2D matrices are held in each element the Cell array's
         % corresponding to the two bond dimenions
         data
@@ -44,7 +48,7 @@ classdef mps_cpn
         % Maximum number of particles allowed on a single site
         N_max
         
-        % Local Bond dimension
+        % Local dimension
         d
         
         % Local creation and Annihilation operators
@@ -79,7 +83,7 @@ classdef mps_cpn
             mps_cpn.zero_thres=1e-15;
             mps_cpn.N=N;
             mps_cpn.N_max=N_max;
-            mps_cpn.d=N_max+1;
+            mps_cpn.d=N_max+1;  % !!! in furute it should be variable as well
             mps_cpn.b = sqrt(diag(1:N_max,1));
             mps_cpn.b_dag = sqrt(diag(1:N_max,-1));
             
@@ -106,7 +110,7 @@ classdef mps_cpn
 
             if M*mps_cpn.N_max < mps_cpn.N
                 error('Too many particles!');
-            else
+            else % !!! replace with end and shift everything below
                 
                 % Generate N random integers between 1 and M.
                 % These correspond to an intial random location for each particle.
@@ -117,6 +121,10 @@ classdef mps_cpn
                 end
                 R = sort(R);
                 
+                % !!! this block of 40ish lines is bad because it needs either:
+                % 1. names of variables that are selfexplanatory
+                % 2. or just describe here what is being done until the
+                % next empty line
                 A = zeros(M,1);
                 C=0;
                 check=0;
@@ -160,6 +168,13 @@ classdef mps_cpn
                     
                 end
                 
+                % !!! I do not understand the need of this block. One
+                % either define the positions of ALL patricles, or NONE (in this 
+                % case they will be placed randomly). In all other cases
+                % this function should give an error, i.e. it is user's
+                % mistake. I get an impression that you overthink this
+                % task here.
+                %
                 % Apply extra algorithm to sort extra particles into free lattice sites
                 if check==1
                     m=1;
@@ -195,6 +210,34 @@ classdef mps_cpn
                     end
                 end
             end
+            
+%             % !!! how about this way? let's discuss
+%             % #####################
+%             if isempty(mps_cpn.P_Positions)
+%                 R=randi(M,1,mps_cpn.N);
+%             else
+%                 R=mps_cpn.P_Positions;
+%             end
+%             if max(R>M) 
+%                 error('wrong location of particles'); 
+%             end
+%             
+%             A=zeros(M,1);
+%             for iM=1:length(R)
+%                A(R(iM))=A(R(iM))+1;
+%             end
+%             
+%             particles_in_lattice=0; % to the right
+%             for iM=M:-1:M
+%                 mps_cpn.data{iM}=cell(mps_cpn.d,mps_cpn.N+1);
+%                 mps_cpn.data{iM}{A(iM)+1,particles_in_lattice+1}=1;
+%                 particles_in_lattice=particles_in_lattice+A(iM);
+%             end
+%             
+%             if particles_in_lattice~=mps_cpn.N
+%                 error('sanity check fail')
+%             end
+%             % #####################
         end
         
         function mps_cpn=set_bond_dim(mps_cpn,trunc)
