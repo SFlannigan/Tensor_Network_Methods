@@ -1,0 +1,11 @@
+# List of ignored files
+
+.DS_Store
+*~
+*.zip
+
+# I would also suggest to add directories such as Snapshots and Data, where one stores extra files
+# related to the project, just uncomment the following line and commit a new change.
+#
+# Snapshots/*
+# Data/*
