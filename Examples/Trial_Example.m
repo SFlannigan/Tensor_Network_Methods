@@ -11,9 +11,6 @@ addpath('../Kernel/');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Lattice parameters
-M=10; % Number of lattice sites
-N =2;% Total number of particles
-N_max =N; % Maximum number of particles allowed per site
 M=5; % Number of lattice sites
 N =5;% Total number of particles
 N_max =3; % Maximum number of particles allowed per site
