@@ -14,6 +14,9 @@ addpath('../Kernel/');
 M=10; % Number of lattice sites
 N =2;% Total number of particles
 N_max =N; % Maximum number of particles allowed per site
+M=5; % Number of lattice sites
+N =5;% Total number of particles
+N_max =3; % Maximum number of particles allowed per site
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -44,10 +47,10 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % Generate 2-site Hamiltonian 
-J=1; U=1; E=0*ones(M,1); u_chem=0;
+J=1; U=10; E=0*ones(M,1); u_chem=0;
 
 % Time-evolution parameters
-dt = 0.05;
+dt = -0.05i;
 T=2;
 time_steps=abs(T/dt);
 
