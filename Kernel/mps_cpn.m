@@ -107,51 +107,86 @@ classdef mps_cpn
             % Nmax == Maximum number of particles allowed on a single site.
             
             M = size(mps_cpn.data,2);
-
+            
             if M*mps_cpn.N_max < mps_cpn.N
                 error('Too many particles!');
-            else % !!! replace with end and shift everything below
-                
-                % Generate N random integers between 1 and M.
-                % These correspond to an intial random location for each particle.
-                if isempty(mps_cpn.P_Positions)
-                    R = randi(M,1,mps_cpn.N);
-                else
-                    R = mps_cpn.P_Positions;
-                end
-                R = sort(R);
-                
-                % !!! this block of 40ish lines is bad because it needs either:
-                % 1. names of variables that are selfexplanatory
-                % 2. or just describe here what is being done until the
-                % next empty line
-                A = zeros(M,1);
+            end
+            
+            % Generate N random integers between 1 and M.
+            % These correspond to an intial random location for each particle.
+            if isempty(mps_cpn.P_Positions)
+                R = randi(M,1,mps_cpn.N);
+            else
+                R = mps_cpn.P_Positions;
+            end
+            R = sort(R);
+            
+            % !!! this block of 40ish lines is bad because it needs either:
+            % 1. names of variables that are selfexplanatory
+            % 2. or just describe here what is being done until the
+            % next empty line
+            A = zeros(M,1);
+            C=0;
+            check=0;
+            for m = 1:M
+                A(m) = C;
                 C=0;
-                check=0;
+                for n = 1:mps_cpn.N
+                    if R(n) == m
+                        A(m) = A(m)+1; % Total number of particles on site m
+                    end
+                end
+                % If the intial random locations give more particles than are
+                % allowed (dictated by N_max) then we carry the extra particles
+                % over to the next site.
+                if A(m)>mps_cpn.N_max
+                    C=A(m)-mps_cpn.N_max;
+                    A(m)=mps_cpn.N_max;
+                    if m==M
+                        % We have reached the end of the lattice and we cannot
+                        % carry over the extra particles.
+                        % We have C extra particles that do not have a lattice site.
+                        % We need to apply an extra algorithm (below) to sort them into
+                        % sites that have spaces.
+                        check=1;
+                    end
+                end
+                
+                if m == 1
+                    B = cell(mps_cpn.d,mps_cpn.N+1);
+                    B{A(m)+1,mps_cpn.N-A(m)+1}=1;
+                elseif m==M
+                    B=cell(mps_cpn.d,1);
+                    B{A(m)+1,1} = 1;
+                else
+                    xr = min(mps_cpn.N+1,mps_cpn.N_max*(M-m)+1);
+                    B = cell(mps_cpn.d,xr);
+                    B{A(m)+1,mps_cpn.N+1-sum(A(1:m))}=1;
+                end
+                B(cellfun(@isempty,B)) = {0};
+                mps_cpn.data{m} = B;
+                
+            end
+            
+            % Apply extra algorithm to sort extra particles into free lattice sites
+            if check==1
+                m=1;
+                % We alter the values of A(m) to ensure the all particles have a
+                % lattice.
+                while C ~=0
+                    D=A(m)+C;
+                    if D > mps_cpn.N_max
+                        C = D-mps_cpn.N_max;
+                        D=mps_cpn.N_max;
+                    else
+                        C=0;
+                    end
+                    A(m)=D;
+                    m=m+1;
+                end
+                
+                % With the new A(m) we construct the MPS
                 for m = 1:M
-                    A(m) = C;
-                    C=0;
-                    for n = 1:mps_cpn.N
-                        if R(n) == m
-                            A(m) = A(m)+1; % Total number of particles on site m
-                        end
-                    end
-                    % If the intial random locations give more particles than are
-                    % allowed (dictated by N_max) then we carry the extra particles
-                    % over to the next site.
-                    if A(m)>mps_cpn.N_max
-                        C=A(m)-mps_cpn.N_max;
-                        A(m)=mps_cpn.N_max;
-                        if m==M
-                            % We have reached the end of the lattice and we cannot
-                            % carry over the extra particles.
-                            % We have C extra particles that do not have a lattice site.
-                            % We need to apply an extra algorithm (below) to sort them into
-                            % sites that have spaces.
-                            check=1;
-                        end
-                    end
-                    
                     if m == 1
                         B = cell(mps_cpn.d,mps_cpn.N+1);
                         B{A(m)+1,mps_cpn.N-A(m)+1}=1;
@@ -165,51 +200,9 @@ classdef mps_cpn
                     end
                     B(cellfun(@isempty,B)) = {0};
                     mps_cpn.data{m} = B;
-                    
-                end
-                
-                % !!! I do not understand the need of this block. One
-                % either define the positions of ALL patricles, or NONE (in this 
-                % case they will be placed randomly). In all other cases
-                % this function should give an error, i.e. it is user's
-                % mistake. I get an impression that you overthink this
-                % task here.
-                %
-                % Apply extra algorithm to sort extra particles into free lattice sites
-                if check==1
-                    m=1;
-                    % We alter the values of A(m) to ensure the all particles have a
-                    % lattice.
-                    while C ~=0
-                        D=A(m)+C;
-                        if D > mps_cpn.N_max
-                            C = D-mps_cpn.N_max;
-                            D=mps_cpn.N_max;
-                        else
-                            C=0;
-                        end
-                        A(m)=D;
-                        m=m+1;
-                    end
-                    
-                    % With the new A(m) we construct the MPS
-                    for m = 1:M
-                        if m == 1
-                            B = cell(mps_cpn.d,mps_cpn.N+1);
-                            B{A(m)+1,mps_cpn.N-A(m)+1}=1;
-                        elseif m==M
-                            B=cell(mps_cpn.d,1);
-                            B{A(m)+1,1} = 1;
-                        else
-                            xr = min(mps_cpn.N+1,mps_cpn.N_max*(M-m)+1);
-                            B = cell(mps_cpn.d,xr);
-                            B{A(m)+1,mps_cpn.N+1-sum(A(1:m))}=1;
-                        end
-                        B(cellfun(@isempty,B)) = {0};
-                        mps_cpn.data{m} = B;
-                    end
                 end
             end
+            
             
 %             % !!! how about this way? let's discuss
 %             % #####################
@@ -1801,108 +1794,6 @@ classdef mps_cpn
             end
             
         end
-        
-        % I attempted to implement a routine that would allow a general 
-        % algorithm that utiises SWAP gates to be applied to any lattice. 
-        % But I gave up, opting instead to create multiple time evolution
-        % functions for different cases.
-        
-%         function mps_cpn = Init_SWAP_Proc(mps_cpn,SWAP)
-%             % SWAP == [Lattice position to Implement SWAP Gate,Number of
-%             % applications of SWAP Gate]
-%             
-%             mps_cpn.Swap_Mat=SWAP;
-%         end
-%         
-%         function [mps_cpn,Total_error] = Time_Evolve_w_SWAP(mps_cpn,U,Sweep_Direction)
-%             % Apply two-site local operators to Entire MPS and truncate if
-%             % necessary.
-%             %
-%              
-%             
-%             M = size(mps_cpn.data,2);
-%             if isempty(mps_cpn.Swap_Mat)
-%                 if strcmp(Sweep_Direction,'L-R')
-%                     start=1;
-%                     End_S = M-1;
-%                     sign = 1;
-%                 elseif strcmp(Sweep_Direction,'R-L')
-%                     start = (M-1);
-%                     End_S = 1;
-%                     sign = -1;
-%                 end
-%                 
-%                 Total_error=0;
-%                 for m=start:sign:End_S
-%                     [mps_cpn,Error] = mps_cpn.Loc_Op_2s_Apply(U,m,Sweep_Direction);
-%                     Total_error = Total_error+Error;
-%                 end
-%             else
-%                 if strcmp(Sweep_Direction,'L-R')
-%                     for s = 1:size(mps_cpn.Swap_Mat,1)+1
-%                         if s==1 
-%                             start=1;
-%                         else
-%                             start=mps_cpn.Swap_Mat(s-1,1)+1;
-%                         end
-%                         if s==size(mps_cpn.Swap_Mat,1)+1
-%                             End_S=M-1;
-%                         else
-%                             End_S=mps_cpn.Swap_Mat(s,1)-1;
-%                         end
-%                         for m = start:End_S
-%                             [mps_cpn,Error] = mps_cpn.Loc_Op_2s_Apply(U,m,Sweep_Direction);
-%                             Total_error = Total_error+Error;
-%                         end
-%                         if End_S<(M-1)
-%                             [mps_cpn,Error] = mps_cpn.SWAP_Loc_Op_2s_Apply(U,End_S+1,Sweep_Direction);
-%                             Total_error = Total_error+Error;
-%                             for sw = 1:(mps_cpn.Swap_Mat(s,2)-1)
-%                                 [mps_cpn,Error] = mps_cpn.SWAP_2s_Only(End_S+1+sw,Sweep_Direction);
-%                                 Total_error = Total_error+Error;
-%                             end
-%                             [mps_cpn,Error] = mps_cpn.Loc_Op_2s_Apply(U,End_S+1+mps_cpn.Swap_Mat(s,2),Sweep_Direction);
-%                             Total_error = Total_error+Error;
-%                             for sw = 1:(mps_cpn.Swap_Mat(s,2))
-%                                 [mps_cpn,Error] = mps_cpn.SWAP_2s_Only(End_S+1-sw+mps_cpn.Swap_Mat(s,2),Sweep_Direction);
-%                                 Total_error = Total_error+Error;
-%                             end
-%                         end
-%                     end
-%                 elseif strcmp(Sweep_Direction,'R-L')
-%                     for s = 1:size(mps_cpn.Swap_Mat,1)+1
-%                         if s==1
-%                             start=M-1;
-%                         else
-%                             start=End_S-2;
-%                         end
-%                         if s==size(mps_cpn.Swap_Mat,1)+1
-%                             End_S=1;
-%                         else
-%                             End_S=mps_cpn.Swap_Mat(end-s+1,1)+mps_cpn.Swap_Mat(end-s+1,2)+1;
-%                         end
-%                         for m = start:-1:End_S
-%                             [mps_cpn,Error] = mps_cpn.Loc_Op_2s_Apply(U,m,Sweep_Direction);
-%                             Total_error = Total_error+Error;
-%                         end
-%                         if End_S>1
-%                             [mps_cpn,Error] = mps_cpn.SWAP_Loc_Op_2s_Apply(U,End_S-1,Sweep_Direction);
-%                             Total_error = Total_error+Error;
-%                             for sw = 1:(mps_cpn.Swap_Mat(s,2)-1)
-%                                 [mps_cpn,Error] = mps_cpn.SWAP_2s_Only(End_S-1-sw,Sweep_Direction);
-%                                 Total_error = Total_error+Error;
-%                             end
-%                             [mps_cpn,Error] = mps_cpn.Loc_Op_2s_Apply(U,End_S-1-mps_cpn.Swap_Mat(s,2),Sweep_Direction);
-%                             Total_error = Total_error+Error;
-%                             for sw = 1:(mps_cpn.Swap_Mat(s,2))
-%                                 [mps_cpn,Error] = mps_cpn.SWAP_2s_Only(End_S-1+sw-mps_cpn.Swap_Mat(s,2),Sweep_Direction);
-%                                 Total_error = Total_error+Error;
-%                             end
-%                         end
-%                     end
-%                 end
-%             end
-%         end 
 
     end
     
