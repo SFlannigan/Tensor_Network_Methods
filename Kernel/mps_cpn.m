@@ -739,7 +739,7 @@ classdef mps_cpn
             % Apply the 2-site local operator to sites m and m+1. Apply 
             % SVD and truncate if necessary.  
             
-            [a_1,g_1] = size(mps_cpn.data{m});
+            [a_1,g_1] = size(mps_cpn.data{m});  % maybe better names
             [a_2,g_2] = size(mps_cpn.data{m+1});
             
             Nl_2 = min(mps_cpn.N+1,(mps_cpn.d-1)*m+1);
@@ -802,6 +802,8 @@ classdef mps_cpn
                 track=track+1;
             end
             
+            % think about d1_vec, d2_vec, NL_vec,...
+            
             % !!! This should be vectorized, i.e. written with as few for-loops
             % as possible. Currently, it is the bottleneck of your code.
             % In order for me to understand it we need to discuss.
@@ -810,11 +812,21 @@ classdef mps_cpn
                 for d_1 = 1:d_1_s(gamma)
                     for d_2 = 1:d_2_s(gamma)
                         if d_1+d_2-2<=mps_cpn.N
+                            
+                            % !!! double-check for indices
+                            table=[];
                             for count = (-min(d_1,track)+1):(d_2-1)
-                                if ((d_1-1)*a_1+d_2 + count*(mps_cpn.d-1))<=a_1*a_2 && track+count<=size(temp,2) && ~isempty(temp{(d_1-1)*a_1+d_2 + count*(mps_cpn.d-1),track+count})
-                                    temp{(d_1-1)*a_1+d_2 + count*(mps_cpn.d-1),track+count} = temp{(d_1-1)*a_1+d_2 + count*(mps_cpn.d-1),track+count} +U((d_1-1)*a_1+d_2 + count*(mps_cpn.d-1),(d_1-1)*a_1+d_2)*L_m{d_1,track}*R_mm{d_2,gamma};
+                                if ((d_1-1)*a_1+d_2 + count*(mps_cpn.d-1))<=...
+                                        a_1*a_2 && track+count<=size(temp,2) &&...
+                                        ~isempty(temp{(d_1-1)*a_1+d_2 + count*(mps_cpn.d-1),track+count})
+                                    table=[table;(d_1-1)*a_1+d_2,count,track+count];
                                 end
-                            end
+                            end                            
+                            for iii = 1:size(table,1)
+                                    temp{table(iii,1)+table(iii,2),table(iii,3)} =...
+                                    temp{table(iii,1)+table(iii,2),table(iii,3)} ...
+                                        +U(table(iii,1)+table(iii,2),table(iii,1))*L_m{d_1,track}*R_mm{d_2,gamma}; 
+                            end                            
                         end
                     end
                 end
@@ -854,7 +866,7 @@ classdef mps_cpn
                 Theta = reshape(Theta,a,d_2,d_1,g); %(a),(l+1),(l),(g)
                 Theta = permute(Theta,[1 3 4 2]); %(a),(l),(g),(l+1)
                 Theta = reshape(Theta,a*d_1,g*d_2); %(l a),(l+1 g)
-                Theta = reshape(Theta,a*d_1,g*d_2); %(l a),(l+1 g)
+                Theta = reshape(Theta,a*d_1,g*d_2); %(l a),(l+1 g) % !!! remove this line
                 [A,S,V]=svd(Theta);
                 
                 S((abs(S))/S(1,1)<mps_cpn.zero_thres)=0;
