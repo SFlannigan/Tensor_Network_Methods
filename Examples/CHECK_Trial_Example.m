@@ -26,7 +26,7 @@ for ii = 1:size(P_Dist,2)
 end
 
 for ii = 1:size(B,1)
-    if all(B(ii,:)==B_Check);
+    if all(B(ii,:)==B_Check)
         ind = ii;
     end
 end
@@ -39,8 +39,9 @@ U_T = expm(-1i*dt*H);
 for t = 1:time_steps
     Psi = U_T*Psi;
 end
-
+Psi=Psi/sqrt(Psi'*Psi);
+[Num_Check] = Get_Site_Occupation(Psi,B);
 W_TEBD = state.Calc_State_Vector(B);
 
-
 Error = 1 - abs(W_TEBD'*Psi)^2
+Num'-Num_Check

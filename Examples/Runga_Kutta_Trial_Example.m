@@ -14,7 +14,7 @@ addpath('../Kernel/');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Lattice parameters
-M=10; % Number of lattice sites
+M=6; % Number of lattice sites
 N =2;% Total number of particles
 N_max =N; % Maximum number of particles allowed per site
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -52,7 +52,7 @@ H=mpo_cpn(M,N_max);
 H=H.Simple_1D_Nearest(J,U,E-u_chem);
 
 % Time-evolution parameters
-dt = -0.05i;
+dt = 0.05;
 T=2;
 time_steps=abs(T/dt);
 
