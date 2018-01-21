@@ -225,8 +225,10 @@ classdef mpo_cpn
             for m = 1:M
                 [alpha,beta]=size(mpo_cpn.data{m});
                 
-                mpo_cpn.data{m}{alpha,1} = mpo_cpn.data{m}{alpha,1}*(1i*dt) + id*r/M;
-                mpo_cpn.data{m}{alpha,2:(beta-1)}=1i*dt*mpo_cpn.data{m}{alpha,2:(beta-1)};
+                mpo_cpn.data{m}{alpha,1} = mpo_cpn.data{m}{alpha,1}*(-1i*dt) - id*r/M;
+                for count = 2:(beta-1)
+                    mpo_cpn.data{m}{alpha,count}=-1i*dt*mpo_cpn.data{m}{alpha,count};
+                end
             end
 
         end

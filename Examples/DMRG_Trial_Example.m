@@ -1,7 +1,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  MPS Ground State Calculation from Product State
-%%  Using Imaginary time evolution algorithm (TEBD)
+%%  Using MPO-DMRG algorithm.
 %%  - With particle number conservation
+%%
 %%
 %%  N Identical Bosons in an M Site Lattice
 %%
@@ -12,8 +13,8 @@ addpath('../Kernel/');
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Lattice parameters
 M=5; % Number of lattice sites
-N=5;% Total number of particles
-N_max=2; % Maximum number of particles allowed per site
+N =5;% Total number of particles
+N_max =N; % Maximum number of particles allowed per site
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -40,55 +41,26 @@ for site = 1:M
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% TEBD (imaginary) time-evolution
+%% DMRG Groud State Calc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Generate 2-site Hamiltonian 
+% Generate MPO Hamiltonian 
 J=1; U=1; E=0*ones(M,1); u_chem=0;
+H=mpo_cpn(M,N_max);
+H=H.Simple_1D_Nearest(J,U,E-u_chem);
 
-% Time-evolution parameters
-dt = -0.05i;
-T=2;
-time_steps=abs(T/dt);
+% Increase Maximum bond dimension. Adds Zeros to the MPS entries.
+Bond_Dim = 10;
+state=state.Increase_bond_dim(Bond_Dim); 
 
-% Choose Maximum bond dimension. The MPS in the future will be truncated to
-% this value. This routine will not immediately change the size of the
-% tensors, but allow the tensors to naturally grow to this value.
-truncation = 10;
-state=state.set_bond_dim(truncation); 
+% No. of DMRG Sweeps
+Sweeps=10;
 
-% Set vector containing Suzuki-Trotter time steps for TEBD time evolution.
-% Only 4th order currently available.
-order = 4;
-state = state.set_Suzuki_Trotter_order(order);
+state=state.DMRG_Sweep(H,Sweeps);
 
-Error=0;
-for tt = 1:time_steps
-    tic
-    
-    [state,Total_error]=state.TEBD_Local_2s_Gates(dt,J,U,E);
-    Error = Error + Total_error;
-    
-    % Check Normalisation
-    Check_Norm = state.Full_Norm;
-    
-    % Particle Number
-    Num=0;
-    for site = 1:M
-        Num = Num+state.Site_Site_Particle_Corr(site,site);
-    end
-    
-    Energy = state.Get_Energy_2s(J,U,E);
-    Var = state.Get_Var_2s(J,U,E);
-    
-    disp(['step #' num2str(tt)...
-        ' -- Variance=' num2str(Var)...
-        ' -- Energy=' num2str(Energy)...
-        ' -- time=' num2str((tt)*dt)...
-        ' -- cpu time=' num2str(toc)...
-        ': P_Num=' num2str(Num)...
-        ': Truncation Error=',num2str(Error)]);
-end
+% Check Normalisation
+Check_Norm = state.Full_Norm;
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Plot Observables

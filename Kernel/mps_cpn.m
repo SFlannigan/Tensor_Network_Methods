@@ -315,21 +315,14 @@ classdef mps_cpn
                     end
                     track=track+1;
                 end
-                
-                id = eye(mps_cpn.d^2);
-                
-                % !!! This should be vectorized, i.e. written with as few for-loops
-                % as possible. Currently, it is the bottleneck of your code.
-                % In order for me to understand it we need to discuss.
+                               
                 track=1;
                 for gamma = (mps_cpn.N+1-g_1+1):Nl_2
                     for d_1 = 1:d_1_s(gamma)
                         for d_2 = 1:d_2_s(gamma)
                             if d_1+d_2-2<=mps_cpn.N
-                                for count = (-min(d_1,track)+1):(d_2-1)
-                                    if ((d_1-1)*a_1+d_2 + count*(mps_cpn.d-1))<=a_1*a_2 && track+count<=size(temp,2) && ~isempty(temp{(d_1-1)*a_1+d_2 + count*(mps_cpn.d-1),track+count})
-                                        temp{(d_1-1)*a_1+d_2 + count*(mps_cpn.d-1),track+count} = temp{(d_1-1)*a_1+d_2 + count*(mps_cpn.d-1),track+count} +id((d_1-1)*a_1+d_2 + count*(mps_cpn.d-1),(d_1-1)*a_1+d_2)*L_m{d_1,track}*R_mm{d_2,gamma};
-                                    end
+                                if ((d_1-1)*a_1+d_2)<=a_1*a_2 && track<=size(temp,2) && ~isempty(temp{(d_1-1)*a_1+d_2,track})
+                                    temp{(d_1-1)*a_1+d_2,track} = temp{(d_1-1)*a_1+d_2,track} + L_m{d_1,track}*R_mm{d_2,gamma};
                                 end
                             end
                         end
@@ -486,13 +479,13 @@ classdef mps_cpn
             % this one there. This function does not even use mps_cpn.
             
             
-            [a,b]= size(X);
+            [a,b2]= size(X);
             Out=X;
             if a < r(1)
                 Out(a+1:r(1),:) = zeros(r(1)-a,size(Out,2));
             end
-            if b < r(2)
-                Out(:,b+1:r(2)) = zeros(size(Out,1),r(2)-b);
+            if b2 < r(2)
+                Out(:,b2+1:r(2)) = zeros(size(Out,1),r(2)-b2);
             end
             
         end
@@ -656,10 +649,7 @@ classdef mps_cpn
         
         function H_2s = Loc_2s_Ham(mps_cpn,M,J,U,E)
             % Generate 2-site local Hamiltonian for TEBD algorithm.
-            %
-            % !!! Functions like this should not necesseraly be inside of
-            % the class, because you are not operating with the class object
-            % at all here. It's just a suggestion. 
+ 
             H_2s = cell(1,M-1);
             
             num = mps_cpn.b_dag*mps_cpn.b;
@@ -862,6 +852,9 @@ classdef mps_cpn
                 r = nnz(S);
                 if r>r_min
                     r_min=r;
+                    if r_min>mps_cpn.Dmax
+                        r_min=mps_cpn.Dmax;
+                    end
                 end
                 if r==0
                     r=1;
@@ -1086,6 +1079,9 @@ classdef mps_cpn
                 r = nnz(S);
                 if r>r_min
                     r_min=r;
+                    if r_min>mps_cpn.Dmax
+                        r_min=mps_cpn.Dmax;
+                    end
                 end
                 if r==0
                     r=1;
@@ -1312,6 +1308,9 @@ classdef mps_cpn
                 r = nnz(S);
                 if r>r_min
                     r_min=r;
+                    if r_min>mps_cpn.Dmax
+                        r_min=mps_cpn.Dmax;
+                    end
                 end
                 if r==0
                     r=1;
@@ -1566,9 +1565,20 @@ classdef mps_cpn
             H_LR1 = mps_cpn.Loc_2s_Ham(M_L+M_R1+1,J,U,E(1:M_L+M_R1+1));
             H_R2 = mps_cpn.Loc_2s_Ham(M_R2+1,J,U,E(M_L+M_R1+1:end));
 
+            num = mps_cpn.b_dag*mps_cpn.b;
+            id = eye(mps_cpn.d);
+            H_1 = U/4*num*(num - id) + E(M_L)/2*num;
+            H_2 = U/6*num*(num - id) + E(M_L+1)/3*num;
+            H_Bond{1} = kron(H_1,id)+kron(id,H_2)-J*kron(mps_cpn.b_dag,mps_cpn.b)-J*kron(mps_cpn.b,mps_cpn.b_dag);
+
+            H_1 = U/6*num*(num - id) + E(M_L+1)/3*num;
+            H_2 = U/4*num*(num - id) + E(M_L+2)/2*num;
+            H_Bond{2} = kron(H_1,id)+kron(id,H_2)-J*kron(mps_cpn.b_dag,mps_cpn.b)-J*kron(mps_cpn.b,mps_cpn.b_dag);
+
+            
             Total_error=0;
             Sweep_Direction = 'L-R';
-            for t = 1:size(mps_cpn.ST_Order,2);
+            for t = 1:size(mps_cpn.ST_Order,2)
                 
                 tau = dt*mps_cpn.ST_Order(t);
                 U_LR1 = cell(size(H_LR1));
@@ -1582,8 +1592,12 @@ classdef mps_cpn
                         U_LR1{m} = expm(-1i*tau*H_LR1{m});
                     end
                 end
+                U_Bond=cell(1,2);
+                for m = 1:2
+                    U_Bond{m}=expm(-1i*tau*H_Bond{m});
+                end
                 
-                [mps_cpn,Error] = mps_cpn.Time_Evolve_Y_Junction(U_LR1,U_R2,Sweep_Direction,M_L,M_R1,M_R2);
+                [mps_cpn,Error] = mps_cpn.Time_Evolve_Y_Junction(U_LR1,U_Bond,U_R2,Sweep_Direction,M_L,M_R1,M_R2);
                 Total_error = Total_error+Error;
                 
                 if strcmp(Sweep_Direction,'L-R')
@@ -1595,7 +1609,7 @@ classdef mps_cpn
             
         end
         
-        function [mps_cpn,Total_error] = Time_Evolve_Y_Junction(mps_cpn,U_LR1,U_R2,Sweep_Direction,M_L,M_R1,M_R2)
+        function [mps_cpn,Total_error] = Time_Evolve_Y_Junction(mps_cpn,U_LR1,U_Bond,U_R2,Sweep_Direction,M_L,M_R1,M_R2)
             % Apply two-site local operators to Entire MPS and truncate if
             % necessary
             %
@@ -1611,11 +1625,13 @@ classdef mps_cpn
             
             if strcmp(Sweep_Direction,'L-R')
                 Total_error=0;
-                for m=1:M_L
+                for m=1:(M_L-1)
                     [mps_cpn,Error] = mps_cpn.Loc_Op_2s_Apply(U_LR1{m},m,Sweep_Direction);
                     Total_error = Total_error+Error;
                 end
-                [mps_cpn,Error] = mps_cpn.SWAP_Loc_Op_2s_Apply(U_LR1{M_L+1},M_L+1,Sweep_Direction);
+                [mps_cpn,Error] = mps_cpn.Loc_Op_2s_Apply(U_Bond{1},M_L,Sweep_Direction);
+                Total_error = Total_error+Error;
+                [mps_cpn,Error] = mps_cpn.SWAP_Loc_Op_2s_Apply(U_Bond{2},M_L+1,Sweep_Direction);
                 Total_error = Total_error+Error;
                 m=M_L+2;
                 for sw = 1:M_R1-1
@@ -1623,7 +1639,7 @@ classdef mps_cpn
                     Total_error = Total_error+Error;
                     m=m+1;
                 end
-                [mps_cpn,Error] = mps_cpn.Loc_Op_2s_Apply(U_LR1{M_L+1},m,Sweep_Direction);
+                [mps_cpn,Error] = mps_cpn.Loc_Op_2s_Apply(U_Bond{2},m,Sweep_Direction);
                 Total_error = Total_error+Error;
                 m=m-1;
                 for sw = 1:(M_R1-1)
@@ -1659,7 +1675,7 @@ classdef mps_cpn
                     Total_error = Total_error+Error;
                 end
 
-                [mps_cpn,Error] = mps_cpn.SWAP_Loc_Op_2s_Apply(U_LR1{M_L+1},M_L+1,'L-R');
+                [mps_cpn,Error] = mps_cpn.SWAP_Loc_Op_2s_Apply(U_Bond{2},M_L+1,'L-R');
                 Total_error = Total_error+Error;
                 m=M_L+2;
                 for sw = 1:M_R1-1
@@ -1667,7 +1683,7 @@ classdef mps_cpn
                     Total_error = Total_error+Error;
                     m=m+1;
                 end
-                [mps_cpn,Error] = mps_cpn.Loc_Op_2s_Apply(U_LR1{M_L+1},m,Sweep_Direction);
+                [mps_cpn,Error] = mps_cpn.Loc_Op_2s_Apply(U_Bond{2},m,Sweep_Direction);
                 Total_error = Total_error+Error;
                 m=m-1;
                 for sw = 1:M_R1
@@ -1675,11 +1691,475 @@ classdef mps_cpn
                     Total_error = Total_error+Error;
                     m=m-1;
                 end
-                for m=M_L:-1:1
+                [mps_cpn,Error] = mps_cpn.Loc_Op_2s_Apply(U_Bond{1},M_L,Sweep_Direction);
+                Total_error = Total_error+Error;
+                for m=(M_L-1):-1:1
                     [mps_cpn,Error] = mps_cpn.Loc_Op_2s_Apply(U_LR1{m},m,Sweep_Direction);
                     Total_error = Total_error+Error;
                 end
             end
+        end
+        
+        function Energy = Get_Energy_2s(mps_cpn,J,U,E)
+            
+            
+            M = size(mps_cpn.data,2);
+            
+            H_2s = mps_cpn.Loc_2s_Ham(M,J,U,E);
+            Energy=0;
+            
+            for m=1:(M-1)
+                mps_cpn.Dmax=size(mps_cpn.data{m}{1,1},2);
+                
+                [temp_mps_cpn,~] = mps_cpn.Loc_Op_2s_Apply(H_2s{m},m,'L-R');
+                
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                % Calculate Overlap
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                expect=cell(1,temp_mps_cpn.N+1);
+                expect(cellfun(@isempty,expect)) = {1};
+                for n = 1:M
+                    [a,g] = size(temp_mps_cpn.data{n});
+                    [alpha,gamma] = size(temp_mps_cpn.data{n}{end,1});
+                    
+                    temp_E = cell(a,g);
+                    for k = 1:a
+                        track=1;
+                        for k_2 = (temp_mps_cpn.N+1-k+1):-1:1
+                            if k_2 <= g
+                                temp_E{k,k_2} = expect{1,temp_mps_cpn.N+1-track+1};
+                            end
+                            track=track+1;
+                        end
+                    end
+                    temp_E(cellfun(@isempty,temp_E)) = {zeros(alpha,alpha)};
+                    
+                    temp = cellfun(@(x,y,z) x'*y*z, mps_cpn.data{n},temp_E,temp_mps_cpn.data{n}, 'UniformOutput', false);
+                    
+                    expect=cell(1,g);
+                    expect(cellfun(@isempty,expect)) = {zeros(size(temp{1,1}))};
+                    
+                    for i=1:a
+                        expect(1,:) = cellfun(@plus, expect, temp(i,:), 'UniformOutput', false);
+                    end
+                    if n<M
+                        if size(expect,2)<temp_mps_cpn.d
+                            expect(:,size(expect,2)+1:temp_mps_cpn.d)={zeros(gamma,gamma)};
+                        end
+                    end
+                end
+                Energy=Energy+cell2mat(expect);
+                
+            end
+        end
+        
+        function Var = Get_Var_2s(mps_cpn,J,U,E)
+            
+            Energy = mps_cpn.Get_Energy_2s(J,U,E);
+            
+            M = size(mps_cpn.data,2);
+            
+            H_2s = mps_cpn.Loc_2s_Ham(M,J,U,E);
+            Var=0;
+            
+            for m=1:(M-1)
+                mps_cpn.Dmax=size(mps_cpn.data{m}{1,1},2);
+                
+                [temp_mps_cpn_2,~] = mps_cpn.Loc_Op_2s_Apply(H_2s{m},m,'L-R');
+                
+                for mm = 1:(M-1)
+                    temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{mm}{1,1},2);
+                    [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_2s{mm},mm,'L-R');
+                    
+                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                    % Calculate Overlap
+                    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                    expect=cell(1,temp_mps_cpn.N+1);
+                    expect(cellfun(@isempty,expect)) = {1};
+                    for n = 1:M
+                        [a,g] = size(temp_mps_cpn.data{n});
+                        [alpha,gamma] = size(temp_mps_cpn.data{n}{end,1});
+                        
+                        temp_E = cell(a,g);
+                        for k = 1:a
+                            track=1;
+                            for k_2 = (temp_mps_cpn.N+1-k+1):-1:1
+                                if k_2 <= g
+                                    temp_E{k,k_2} = expect{1,temp_mps_cpn.N+1-track+1};
+                                end
+                                track=track+1;
+                            end
+                        end
+                        temp_E(cellfun(@isempty,temp_E)) = {zeros(alpha,alpha)};
+                        
+                        temp = cellfun(@(x,y,z) x'*y*z, mps_cpn.data{n},temp_E,temp_mps_cpn.data{n}, 'UniformOutput', false);
+                        
+                        expect=cell(1,g);
+                        expect(cellfun(@isempty,expect)) = {zeros(size(temp{1,1}))};
+                        
+                        for i=1:a
+                            expect(1,:) = cellfun(@plus, expect, temp(i,:), 'UniformOutput', false);
+                        end
+                        if n<M
+                            if size(expect,2)<temp_mps_cpn.d
+                                expect(:,size(expect,2)+1:temp_mps_cpn.d)={zeros(gamma,gamma)};
+                            end
+                        end
+                    end
+                    Var=Var+cell2mat(expect);
+                end
+            end
+            
+            Var=(Var-Energy^2)/Var;
+            
+        end
+        
+        function Energy = Get_Energy_2s_Y_Junction(mps_cpn,J,U,E,M_L,M_R1,M_R2)
+
+            M = size(mps_cpn.data,2);
+            
+            temp_H_LR1 = mps_cpn.Loc_2s_Ham(M_L+M_R1+1,J,U,E(1:M_L+M_R1+1));
+            temp_H_R2 = mps_cpn.Loc_2s_Ham(M_R2+1,J,U,E(M_L+M_R1+1:end));
+            
+            H_LR1 = cell(size(temp_H_LR1));
+            H_R2 = cell(1,M-1);
+            track=2;
+            for m = 1:(M-1)
+                if m > M_L+M_R1+1
+                    H_R2{m} = temp_H_R2{track};
+                    track=track+1;
+                elseif m < M_L+M_R1+1
+                    H_LR1{m} = temp_H_LR1{m};
+                end
+            end
+            num = mps_cpn.b_dag*mps_cpn.b;
+            id = eye(mps_cpn.d);
+            H_1 = U/4*num*(num - id) + E(M_L)/2*num;
+            H_2 = U/6*num*(num - id) + E(M_L+1)/3*num;
+            H_Bond{1} = kron(H_1,id)+kron(id,H_2)-J*kron(mps_cpn.b_dag,mps_cpn.b)-J*kron(mps_cpn.b,mps_cpn.b_dag);
+
+            H_1 = U/6*num*(num - id) + E(M_L+1)/3*num;
+            H_2 = U/4*num*(num - id) + E(M_L+2)/2*num;
+            H_Bond{2} = kron(H_1,id)+kron(id,H_2)-J*kron(mps_cpn.b_dag,mps_cpn.b)-J*kron(mps_cpn.b,mps_cpn.b_dag);
+
+            
+            Energy=0;
+            
+            for m=1:(M_L-1)
+                mps_cpn.Dmax=size(mps_cpn.data{m}{1,1},2);
+                [temp_mps_cpn,~] = mps_cpn.Loc_Op_2s_Apply(H_LR1{m},m,'L-R');
+                Energy=Energy+calc_overlap(M,temp_mps_cpn,mps_cpn);
+            end
+            m=M_L;
+            mps_cpn.Dmax=size(mps_cpn.data{m}{1,1},2);
+            [temp_mps_cpn,~] = mps_cpn.Loc_Op_2s_Apply(H_Bond{1},m,'L-R');
+            Energy=Energy+calc_overlap(M,temp_mps_cpn,mps_cpn);
+            m=M_L+1;
+            mps_cpn.Dmax=size(mps_cpn.data{m}{1,1},2);
+            [temp_mps_cpn,~] = mps_cpn.Loc_Op_2s_Apply(H_Bond{2},m,'L-R');
+            Energy=Energy+calc_overlap(M,temp_mps_cpn,mps_cpn);
+            
+            m=M_L+1;
+            for sw = 1:M_R1
+                [mps_cpn,~] = mps_cpn.SWAP_2s_Only(m,'L_R');
+                m=m+1;
+            end
+            mps_cpn.Dmax=size(mps_cpn.data{m}{1,1},2);
+            [temp_mps_cpn,~] = mps_cpn.Loc_Op_2s_Apply(H_Bond{2},m,'L_R');
+            
+            for sw = 1:M_R1
+                [mps_cpn,~] = mps_cpn.SWAP_2s_Only(m,'R-L');
+                [temp_mps_cpn,~] = temp_mps_cpn.SWAP_2s_Only(m,'R-L');
+                m=m-1;
+            end
+            Energy=Energy+calc_overlap(M,temp_mps_cpn,mps_cpn);
+            
+            for m = (M_L+2):(M_L+M_R1)
+                mps_cpn.Dmax=size(mps_cpn.data{m}{1,1},2);
+                [temp_mps_cpn,~] = mps_cpn.Loc_Op_2s_Apply(H_LR1{m},m,'L-R');
+                Energy=Energy+calc_overlap(M,temp_mps_cpn,mps_cpn);
+            end
+            
+            for m = (M_L+M_R1+2):(M_L+M_R1+M_R2)
+                mps_cpn.Dmax=size(mps_cpn.data{m}{1,1},2);
+                [temp_mps_cpn,~] = mps_cpn.Loc_Op_2s_Apply(H_R2{m},m,'L-R');
+                Energy=Energy+calc_overlap(M,temp_mps_cpn,mps_cpn);
+            end
+            
+            
+            function Y=calc_overlap(M,temp_mps_cpn,mps_cpn)
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                % Calculate Overlap
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                expect=cell(1,temp_mps_cpn.N+1);
+                expect(cellfun(@isempty,expect)) = {1};
+                for n = 1:M
+                    if any(size(temp_mps_cpn.data{n}{1,1})<size(mps_cpn.data{n}{1,1}))
+                        [r1,r2]=size(mps_cpn.data{n}{1,1});
+                        temp_mps_cpn.data{n}=cellfun(@(x) temp_mps_cpn.cell_resize_func(x,[r1,r2]),temp_mps_cpn.data{n},'UniformOutput', false);
+                    end
+                    
+                    [a,g] = size(temp_mps_cpn.data{n});
+                    [alpha,gamma] = size(temp_mps_cpn.data{n}{end,1});
+                    
+                    temp_E = cell(a,g);
+                    for k = 1:a
+                        track=1;
+                        for k_2 = (temp_mps_cpn.N+1-k+1):-1:1
+                            if k_2 <= g
+                                temp_E{k,k_2} = expect{1,temp_mps_cpn.N+1-track+1};
+                            end
+                            track=track+1;
+                        end
+                    end
+                    temp_E(cellfun(@isempty,temp_E)) = {zeros(alpha,alpha)};
+
+                    temp = cellfun(@(x,y,z) x'*y*z, mps_cpn.data{n},temp_E,temp_mps_cpn.data{n}, 'UniformOutput', false);
+                    
+                    expect=cell(1,g);
+                    expect(cellfun(@isempty,expect)) = {zeros(size(temp{1,1}))};
+                    
+                    for i=1:a
+                        expect(1,:) = cellfun(@plus, expect, temp(i,:), 'UniformOutput', false);
+                    end
+                    if n<M
+                        if size(expect,2)<temp_mps_cpn.d
+                            expect(:,size(expect,2)+1:temp_mps_cpn.d)={zeros(gamma,gamma)};
+                        end
+                    end
+                end
+                Y=cell2mat(expect);
+            end
+            
+        end
+        
+        function [Var,Energy] = Get_Var_2s_Y_Junction(mps_cpn,J,U,E,M_L,M_R1,M_R2)
+
+            Energy = mps_cpn.Get_Energy_2s_Y_Junction(J,U,E,M_L,M_R1,M_R2);
+            
+            M = size(mps_cpn.data,2);
+            
+            temp_H_LR1 = mps_cpn.Loc_2s_Ham(M_L+M_R1+1,J,U,E(1:M_L+M_R1+1));
+            temp_H_R2 = mps_cpn.Loc_2s_Ham(M_R2+1,J,U,E(M_L+M_R1+1:end));
+            
+            H_LR1 = cell(size(temp_H_LR1));
+            H_R2 = cell(1,M-1);
+            track=2;
+            for m = 1:(M-1)
+                if m > M_L+M_R1+1
+                    H_R2{m} = temp_H_R2{track};
+                    track=track+1;
+                elseif m < M_L+M_R1+1
+                    H_LR1{m} = temp_H_LR1{m};
+                end
+            end
+            
+            Var=0;
+            
+            for mm=1:(M_L+1)
+                mps_cpn.Dmax=size(mps_cpn.data{mm}{1,1},2);
+                [temp_mps_cpn_2,~] = mps_cpn.Loc_Op_2s_Apply(H_LR1{mm},mm,'L-R');
+                for m=1:(M_L+1)
+                    temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                    [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_LR1{m},m,'L-R');
+                    Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+                end
+                
+                m=M_L+1;
+                for sw = 1:M_R1
+                    [temp_mps_cpn_2,~] = temp_mps_cpn_2.SWAP_2s_Only(m,'L_R');
+                    m=m+1;
+                end
+                temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_LR1{M_L+1},m,'L_R');
+                
+                for sw = 1:M_R1
+                    [temp_mps_cpn_2,~] = temp_mps_cpn_2.SWAP_2s_Only(m,'R-L');
+                    [temp_mps_cpn,~] = temp_mps_cpn.SWAP_2s_Only(m,'R-L');
+                    m=m-1;
+                end
+                Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+                
+                for m = (M_L+2):(M_L+M_R1)
+                    temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                    [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_LR1{m},m,'L-R');
+                    Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+                end
+                
+                for m = (M_L+M_R1+2):(M_L+M_R1+M_R2)
+                    temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                    [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_R2{m},m,'L-R');
+                    Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+                end
+            end
+
+            mm=M_L+1;
+            for sw = 1:M_R1
+                [mps_cpn,~] = mps_cpn.SWAP_2s_Only(mm,'L_R');
+                mm=mm+1;
+            end
+            mps_cpn.Dmax=size(mps_cpn.data{mm}{1,1},2);
+            [temp_mps_cpn_2,~] = mps_cpn.Loc_Op_2s_Apply(H_LR1{M_L+1},mm,'L_R');
+            
+            for sw = 1:M_R1
+                [mps_cpn,~] = mps_cpn.SWAP_2s_Only(mm,'R-L');
+                [temp_mps_cpn_2,~] = temp_mps_cpn_2.SWAP_2s_Only(mm,'R-L');
+                mm=mm-1;
+            end
+            for m=1:(M_L+1)
+                temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_LR1{m},m,'L-R');
+                Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+            end
+            
+            m=M_L+1;
+            for sw = 1:M_R1
+                [temp_mps_cpn_2,~] = temp_mps_cpn_2.SWAP_2s_Only(m,'L_R');
+                m=m+1;
+            end
+            temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+            [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_LR1{M_L+1},m,'L_R');
+            
+            for sw = 1:M_R1
+                [temp_mps_cpn_2,~] = temp_mps_cpn_2.SWAP_2s_Only(m,'R-L');
+                [temp_mps_cpn,~] = temp_mps_cpn.SWAP_2s_Only(m,'R-L');
+                m=m-1;
+            end
+            Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+            
+            for m = (M_L+2):(M_L+M_R1)
+                temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_LR1{m},m,'L-R');
+                Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+            end
+            
+            for m = (M_L+M_R1+2):(M_L+M_R1+M_R2)
+                temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_R2{m},m,'L-R');
+                Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+            end
+
+            for mm = (M_L+2):(M_L+M_R1)
+                mps_cpn.Dmax=size(mps_cpn.data{mm}{1,1},2);
+                [temp_mps_cpn_2,~] = mps_cpn.Loc_Op_2s_Apply(H_LR1{mm},mm,'L-R');
+                for m=1:(M_L+1)
+                    temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                    [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_LR1{m},m,'L-R');
+                    Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+                end
+                
+                m=M_L+1;
+                for sw = 1:M_R1
+                    [temp_mps_cpn_2,~] = temp_mps_cpn_2.SWAP_2s_Only(m,'L_R');
+                    m=m+1;
+                end
+                temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_LR1{M_L+1},m,'L_R');
+                
+                for sw = 1:M_R1
+                    [temp_mps_cpn_2,~] = temp_mps_cpn_2.SWAP_2s_Only(m,'R-L');
+                    [temp_mps_cpn,~] = temp_mps_cpn.SWAP_2s_Only(m,'R-L');
+                    m=m-1;
+                end
+                Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+                
+                for m = (M_L+2):(M_L+M_R1)
+                    temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                    [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_LR1{m},m,'L-R');
+                    Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+                end
+                
+                for m = (M_L+M_R1+2):(M_L+M_R1+M_R2)
+                    temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                    [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_R2{m},m,'L-R');
+                    Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+                end
+            end
+            
+            for mm = (M_L+M_R1+2):(M_L+M_R1+M_R2)
+                mps_cpn.Dmax=size(mps_cpn.data{mm}{1,1},2);
+                [temp_mps_cpn_2,~] = mps_cpn.Loc_Op_2s_Apply(H_R2{mm},mm,'L-R');
+                for m=1:(M_L+1)
+                    temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                    [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_LR1{m},m,'L-R');
+                    Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+                end
+                
+                m=M_L+1;
+                for sw = 1:M_R1
+                    [temp_mps_cpn_2,~] = temp_mps_cpn_2.SWAP_2s_Only(m,'L_R');
+                    m=m+1;
+                end
+                temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_LR1{M_L+1},m,'L_R');
+                
+                for sw = 1:M_R1
+                    [temp_mps_cpn_2,~] = temp_mps_cpn_2.SWAP_2s_Only(m,'R-L');
+                    [temp_mps_cpn,~] = temp_mps_cpn.SWAP_2s_Only(m,'R-L');
+                    m=m-1;
+                end
+                Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+                
+                for m = (M_L+2):(M_L+M_R1)
+                    temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                    [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_LR1{m},m,'L-R');
+                    Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+                end
+                
+                for m = (M_L+M_R1+2):(M_L+M_R1+M_R2)
+                    temp_mps_cpn_2.Dmax=size(temp_mps_cpn_2.data{m}{1,1},2);
+                    [temp_mps_cpn,~] = temp_mps_cpn_2.Loc_Op_2s_Apply(H_R2{m},m,'L-R');
+                    Var=Var+calc_overlap(M,temp_mps_cpn,mps_cpn);
+                end
+                
+                Var=(Var-Energy^2)/Var;
+            end
+            
+            
+            function Y=calc_overlap(M,temp_mps_cpn,mps_cpn)
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                % Calculate Overlap
+                %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                expect=cell(1,temp_mps_cpn.N+1);
+                expect(cellfun(@isempty,expect)) = {1};
+                for n = 1:M
+                    if any(size(temp_mps_cpn.data{n}{1,1})<size(mps_cpn.data{n}{1,1}))
+                        [r1,r2]=size(mps_cpn.data{n}{1,1});
+                        temp_mps_cpn.data{n}=cellfun(@(x) temp_mps_cpn.cell_resize_func(x,[r1,r2]),temp_mps_cpn.data{n},'UniformOutput', false);
+                    end
+                    
+                    [a,g] = size(temp_mps_cpn.data{n});
+                    [alpha,gamma] = size(temp_mps_cpn.data{n}{end,1});
+                    
+                    temp_E = cell(a,g);
+                    for k = 1:a
+                        track=1;
+                        for k_2 = (temp_mps_cpn.N+1-k+1):-1:1
+                            if k_2 <= g
+                                temp_E{k,k_2} = expect{1,temp_mps_cpn.N+1-track+1};
+                            end
+                            track=track+1;
+                        end
+                    end
+                    temp_E(cellfun(@isempty,temp_E)) = {zeros(alpha,alpha)};
+
+                    temp = cellfun(@(x,y,z) x'*y*z, mps_cpn.data{n},temp_E,temp_mps_cpn.data{n}, 'UniformOutput', false);
+                    
+                    expect=cell(1,g);
+                    expect(cellfun(@isempty,expect)) = {zeros(size(temp{1,1}))};
+                    
+                    for i=1:a
+                        expect(1,:) = cellfun(@plus, expect, temp(i,:), 'UniformOutput', false);
+                    end
+                    if n<M
+                        if size(expect,2)<temp_mps_cpn.d
+                            expect(:,size(expect,2)+1:temp_mps_cpn.d)={zeros(gamma,gamma)};
+                        end
+                    end
+                end
+                Y=cell2mat(expect);
+            end
+            
         end
         
         function W_TEBD = Calc_State_Vector(mps_cpn,B)
@@ -1724,14 +2204,15 @@ classdef mps_cpn
             % [1] - Juan Jose Garcia-Ripoll, 'Time evolution of Matrix 
             % Product States' IOP, (2006)
             
-            order = size(mps_cpn.RK_Roots,2);
+            order = size(mps_cpn.RK_Roots,1);
             
             Total_error=0;
-            for c = 1:(order-1)
+            for c = 1:order
                 H=H.Eff_Time_Evolve(dt,mps_cpn.RK_Roots(c));
                 
                 mps_cpn = mps_cpn.Apply_MPO(H);
                 
+                % Truncate and Canonicalise
                 [mps_cpn,error] = Canonicalisation_2s(mps_cpn,'L-R');
                 Total_error=Total_error+error;
             end
@@ -1743,55 +2224,121 @@ classdef mps_cpn
             M = size(mps_cpn.data,2);
             
             for m = 1:M
-                [alpha,beta]=size(H.data{m});
-                Store = cell(alpha,beta);
+                [k1,k2]=size(H.data{m});
+                Store = cell(k1,k2);
+                [alpha,beta]=size(mps_cpn.data{m}{1,1});
+                [~,NR]=size(mps_cpn.data{m});
+                Nl = min((mps_cpn.d-1)*(m-1)+1,mps_cpn.N+1);
                 
-                for a_count = 1:alpha
-                    for b_count = 1:beta
-                        if H.data{m}==0
-                            Store{a_count,b_count}=0*mps_cpn.data{m};
-                        elseif H.data{m}==1
-                            Store{a_count,b_count}=mps_cpn.data{m};
+                [a,g] = size(mps_cpn.data{m});
+                temp_Zeros = cell(a,g);
+                temp_Zeros(cellfun(@isempty,temp_Zeros)) = {zeros(alpha,beta)};
+                for a_count = 1:k1
+                    for b_count = 1:k2
+                        if all(all(H.data{m}{a_count,b_count}==0))
+                            Store{a_count,b_count}=cell2mat(cellfun(@(x,y) x.*y, mps_cpn.data{m},temp_Zeros, 'UniformOutput', false));
+                        elseif all(all(H.data{m}{a_count,b_count}==1))
+                            Store{a_count,b_count}=cell2mat(mps_cpn.data{m});
                         else
-                            [a,g] = size(mps_cpn.data{m});
-                            [kappa,gamma] = size(mps_cpn.data{m}{end,1});
-                            Nl = min((mps_cpn.d-1)*(site1-1)+1,mps_cpn.N+1);
+                            O=H.data{m}{a_count,b_count};
                             
                             temp = cell(a,g);
-                            temp(cellfun(@isempty,temp)) = {zeros(kappa,gamma)};
+                            temp(cellfun(@isempty,temp)) = {zeros(alpha,beta)};
                             for l = 1:mps_cpn.d
                                 for N_R = max(1,(g-Nl-l+2)):max(1,min(g,mps_cpn.N+1-l+1))
                                     for count2 = (-mps_cpn.d+l):(l-1)
-                                        temp{l-count2,N_R} = temp{l-count2,N_R}+mps_cpn.b(l-count2,l)*O{site1}{l,N_R};
+                                        temp{l-count2,N_R} = temp{l-count2,N_R}+O(l-count2,l)*mps_cpn.data{m}{l,N_R};
                                     end
                                 end
                             end
                             
-                            if mpo_cpn.N_track{m}{beta}==1
+                            if H.N_track{m}{b_count}==1
                                 m_temp = cell(a,g);
-                                for m1 = 2:m_g
+                                for m1 = 2:g
                                     m_temp(:,m1) = temp(:,m1-1);
                                 end
-                                m_temp(cellfun(@isempty,m_temp)) = {zeros(size(kappa,gamma))};
+                                m_temp(cellfun(@isempty,m_temp)) = {zeros(alpha,beta)};
                                 temp = m_temp;
-                            elseif mpo_cpn.N_track{m}{beta}==-1
+                            elseif H.N_track{m}{b_count}==-1
                                 m_temp = cell(a,g);
-                                for m1 = 1:m_g-1
+                                for m1 = 1:g-1
                                     m_temp(:,m1) = temp(:,m1+1);
                                 end
-                                m_temp(cellfun(@isempty,m_temp)) = {zeros(size(kappa,gamma))};
+                                m_temp(cellfun(@isempty,m_temp)) = {zeros(alpha,beta)};
                                 temp=m_temp;
                             end
                             
-                            Store{a_count,b_count}=temp;
+                            Store{a_count,b_count}=cell2mat(temp);
                         end
                         
                     end
                 end
                 
+                Store = cell2mat(Store);
+                % Store == (k1,d,alpha),(k2,NR,beta)
+                Mat = reshape(Store,alpha,mps_cpn.d,k1,beta,NR,k2); %alpha,d,k1,beta,NR,k2
+                Mat = permute(Mat,[1 3 4 6 2 5]); %alpha,k1,beta,k2,d,NR
+                Mat = reshape(Mat,alpha*k1,beta*k2,mps_cpn.d,NR); %(k1 alpha),(k2 beta),d,NR
                 
+                temp = cell(mps_cpn.d,NR);
+                for count = 1:mps_cpn.d
+                    for Num_r = max(1,(g-Nl-count+2)):max(1,min(g,mps_cpn.N+1-count+1))
+                        temp(count,Num_r) = {Mat(:,:,count,Num_r)};
+                    end
+                end
+                temp(cellfun(@isempty,temp)) = {zeros(alpha*k1,beta*k2)};
+                
+                mps_cpn.data{m} = temp;
                 
             end
+            
+        end
+        
+        function mps_cpn = Increase_bond_dim(mps_cpn,Bond_Dim)
+            % Increase Maximum bond dimension. Adds Zeros to the MPS entries.
+            
+             M = size(mps_cpn.data,2);
+             
+             for m = 1:M
+                 [~,g] = size(mps_cpn.data{m});
+                 Nl = min((mps_cpn.d-1)*(m-1)+1,mps_cpn.N+1);
+                 [alpha,beta] = size(mps_cpn.data{m}{1,1});
+                 
+                 BL = max(alpha,Bond_Dim);
+                 BR = max(beta,Bond_Dim);
+                 
+                 for count = 1:mps_cpn.d
+                     for Num_r = max(1,(g-Nl-count+2)):max(1,min(g,mps_cpn.N+1-count+1))
+                         temp = mps_cpn.data{m}{count,Num_r};
+                         temp(:,beta+1:BR) = zeros(alpha,length(beta+1:BR));
+                         temp(alpha+1:BL,:) = zeros(length(alpha+1:BL),BR);
+                         mps_cpn.data{m}{count,Num_r}=temp;
+                     end
+                 end
+                 
+             end
+            
+        end
+        
+        function mps_cpn = DMRG(mps_cpn,H,Sweeps)
+            % Apply DMRG procedure
+            
+            M = size(mps_cpn.data,2);
+            
+            %%%%%%%%%%%%%%%%%%%%%%%
+            % Calculate Initial Left Effective Hamiltonian
+            %%%%%%%%%%%%%%%%%%%%%%%
+            L = cell(1,M);
+            L{1} = 1;
+            for m = 1:(M-1)
+                L{m+1} = mps_cpn.Add_Left_Eff_Ham(H,L{m},m+1);
+            end
+            
+        end
+        
+        function mps_cpn = Add_Left_Eff_Ham(mps_cpn,H,L,m)
+            
+%             [k1,k2] = size(H.data,
             
         end
 
