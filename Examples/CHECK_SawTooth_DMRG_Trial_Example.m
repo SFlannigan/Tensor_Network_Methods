@@ -1,5 +1,5 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Check for MPS. Run after 'Trial_Example'
+%% Check for MPS. Run after 'DMRG_Trial_Example'
 %%
 %% Compares the wavefunction of the TEBD to Exact Diagonalisation
 %%
@@ -15,10 +15,8 @@ end
 
 addpath('../Kernel/E_D');
 
-time_steps=floor(T/abs(dt));
-
 B = Basis_set(N,M);
-H = Onsite_Ham(B,E)+Hop_Ham(B,J,J,'Edge')+Int_Ham(B,U*ones(1,M),U*ones(1,M));
+H = Onsite_Ham(B,E)+Hop_Ham_SawTooth(B,J,Jdash)+Int_Ham(B,U*ones(1,M),U*ones(1,M));
 
 P_Dist = state.P_Positions;
 B_Check = zeros(1,size(B,2));
@@ -33,16 +31,9 @@ for ii = 1:size(B,1)
     end
 end
 
-Psi = zeros(size(B,1),1);
-Psi(ind)=1;
+[Psi,Energy]=eigs(H,1,'smallestreal');
 
-U_T = expm(-1i*dt*H);
-
-for t = 1:time_steps
-    Psi = U_T*Psi;
-    Psi=Psi/sqrt(Psi'*Psi);
-end
-
+% Psi=Psi/sqrt(Psi'*Psi);
 [Num_Check] = Get_Site_Occupation(Psi,B);
 W_TEBD = state.Calc_State_Vector(B);
 % W_TEBD=W_TEBD/sqrt(W_TEBD'*W_TEBD);

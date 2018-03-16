@@ -31,10 +31,6 @@ classdef mps_cpn
         % the local dimension and the other is the number of particles to
         % the right (or left).
         %
-        % !!! but you do not say anything below on how you change this
-        % second dimension, i.e. when it count particle to the left and
-        % when to the right. I assume you always count them to the right.
-        %
         % 2D matrices are held in each element the Cell array's
         % corresponding to the two bond dimenions
         data
@@ -116,15 +112,12 @@ classdef mps_cpn
             % These correspond to an intial random location for each particle.
             if isempty(mps_cpn.P_Positions)
                 R = randi(M,1,mps_cpn.N);
+                mps_cpn.P_Positions=R;
             else
                 R = mps_cpn.P_Positions;
             end
             R = sort(R);
             
-            % !!! this block of 40ish lines is bad because it needs either:
-            % 1. names of variables that are selfexplanatory
-            % 2. or just describe here what is being done until the
-            % next empty line
             A = zeros(M,1);
             C=0;
             check=0;
@@ -202,35 +195,6 @@ classdef mps_cpn
                     mps_cpn.data{m} = B;
                 end
             end
-            
-            
-%             % !!! how about this way? let's discuss
-%             % #####################
-%             if isempty(mps_cpn.P_Positions)
-%                 R=randi(M,1,mps_cpn.N);
-%             else
-%                 R=mps_cpn.P_Positions;
-%             end
-%             if max(R>M) 
-%                 error('wrong location of particles'); 
-%             end
-%             
-%             A=zeros(M,1);
-%             for iM=1:length(R)
-%                A(R(iM))=A(R(iM))+1;
-%             end
-%             
-%             particles_in_lattice=0; % to the right
-%             for iM=M:-1:M
-%                 mps_cpn.data{iM}=cell(mps_cpn.d,mps_cpn.N+1);
-%                 mps_cpn.data{iM}{A(iM)+1,particles_in_lattice+1}=1;
-%                 particles_in_lattice=particles_in_lattice+A(iM);
-%             end
-%             
-%             if particles_in_lattice~=mps_cpn.N
-%                 error('sanity check fail')
-%             end
-%             % #####################
         end
         
         function mps_cpn=set_bond_dim(mps_cpn,trunc)
@@ -367,7 +331,8 @@ classdef mps_cpn
                     
                     S((abs(S))/S(1,1)<mps_cpn.zero_thres)=0;
                     
-                    r = nnz(S);
+%                     r = min(max(nnz(S),min(mps_cpn.d^(m),mps_cpn.d^(M-m))),size(S,2));
+                    r=nnz(S);
                     if r>r_min
                         r_min=r;
                     end
@@ -460,10 +425,7 @@ classdef mps_cpn
             % Function used to calculate normalisation of two site MPS
             % tensor.
             % Used by 'Canonicalisation_2s' and 'Time_Evolve'.
-            %
-            % !!! Create a directory with useful extra functions and put
-            % this one there. This function does not even use mps_cpn.
-            
+  
             if ~isempty(x)
                 x = sum(diag(x'*x));
             end
@@ -474,11 +436,7 @@ classdef mps_cpn
             % Function used to resize MPS
             % tensor.
             % Used by 'Canonicalisation_2s' and 'Time_Evolve'.
-            %
-            % !!! Create a directory with useful extra functions and put
-            % this one there. This function does not even use mps_cpn.
-            
-            
+      
             [a,b2]= size(X);
             Out=X;
             if a < r(1)
@@ -636,13 +594,11 @@ classdef mps_cpn
             end
             N=cell2mat(expect);
         end
-        
+
         function mps_cpn = set_Suzuki_Trotter_order(mps_cpn,order)
             % Set vecotr containing Suzuki-Trotter time steps for TEBD time
             % evolution
             if order ==  4
-                % !!! You should also mark in which direction you go. Look
-                % at Eqs. (6.43)-(6.45) in Johannes's PhD
                 mps_cpn.ST_Order = [1/12,1/12,1/12,-1/6,1/12,0,1/12,0,1/12,0,1/12,1/12,1/12,1/12,0,1/12,0,1/12,0,1/12,-1/6,1/12,1/12,1/12];
             end
         end
@@ -778,11 +734,7 @@ classdef mps_cpn
             
             d_2_s = (mps_cpn.N+1):-1:1;
             d_2_s(d_2_s>mps_cpn.d)=mps_cpn.d;
-            
-            % Make temp as a matrix!!!
-            % Use cells only when you do not know the exact sizes of the
-            % object. Everything below can be rewritten with matrix
-            % multiplications, i.e. it will be a gazilion time faster.
+
             temp = cell(a_1*a_2,length((1+mps_cpn.N+1-g_1):Nl_2));
             track=1;
             for gamma = (1+mps_cpn.N+1-g_1):Nl_2
@@ -791,12 +743,16 @@ classdef mps_cpn
                 end
                 track=track+1;
             end
+<<<<<<< HEAD
             
             % think about d1_vec, d2_vec, NL_vec,...
             
             % !!! This should be vectorized, i.e. written with as few for-loops
             % as possible. Currently, it is the bottleneck of your code.
             % In order for me to understand it we need to discuss.
+=======
+
+>>>>>>> Working_Branch
             track=1;
             for gamma = (mps_cpn.N+1-g_1+1):Nl_2
                 for d_1 = 1:d_1_s(gamma)
@@ -1232,17 +1188,13 @@ classdef mps_cpn
                 track=track+1;
             end
             
-            id = eye(mps_cpn.d^2);
-            
             track=1;
             for gamma = (mps_cpn.N+1-g_1+1):Nl_2
                 for d_1 = 1:d_1_s(gamma)
                     for d_2 = 1:d_2_s(gamma)
                         if d_1+d_2-2<=mps_cpn.N
-                            for count = (-min(d_1,track)+1):(d_2-1)
-                                if ((d_1-1)*a_1+d_2 + count*(mps_cpn.d-1))<=a_1*a_2 && track+count<=size(temp,2) && ~isempty(temp{(d_1-1)*a_1+d_2 + count*(mps_cpn.d-1),track+count})
-                                    temp{(d_1-1)*a_1+d_2 + count*(mps_cpn.d-1),track+count} = temp{(d_1-1)*a_1+d_2 + count*(mps_cpn.d-1),track+count} +id((d_1-1)*a_1+d_2 + count*(mps_cpn.d-1),(d_1-1)*a_1+d_2)*L_m{d_1,track}*R_mm{d_2,gamma};
-                                end
+                            if ((d_1-1)*a_1+d_2)<=a_1*a_2 && track<=size(temp,2) && ~isempty(temp{(d_1-1)*a_1+d_2,track})
+                                temp{(d_1-1)*a_1+d_2,track} = temp{(d_1-1)*a_1+d_2,track} + L_m{d_1,track}*R_mm{d_2,gamma};
                             end
                         end
                     end
@@ -1404,10 +1356,7 @@ classdef mps_cpn
             % Either plots a 1D graph of the particle number distribution,
             % or a 2D surf plot of the site-site correlation function
             % depending on the dimension of the input matrix.
-            %
-            % !!! Create a directory with useful extra functions and put
-            % this one there. This function does not even use mps_cpn.
-            
+
             M = max(size(Corr));
             dim = sum(size(Corr)>1);
             
@@ -2179,19 +2128,33 @@ classdef mps_cpn
             
             W_TEBD=zeros(size(B,1),1);
             for n = 1:size(B,1)
-                
                 for m = 1:size(B,2)
-                    mps_cpn.d = B(n,m)+1;
-                    if m ~= size(B,2)
-                        N_R = sum(B(n,(m+1):end))+1;
+                    d_iter = B(n,m)+1;
+                    if d_iter<=mps_var.d
+                        if m ~= size(B,2)
+                            N_R = sum(B(n,(m+1):end))+1;
+                        else
+                            N_R=1;
+                        end
+                        if N_R <= max(mps_var.d*(size(B,2)-m),1)
+                            if m==1
+                                W=mps_var.data{m}{d_iter,N_R};
+                            else
+                                W=W*mps_var.data{m}{d_iter,N_R};
+                            end
+                        else
+                            if m==1
+                                W=zeros(size(mps_var.data{m}{1,1}));
+                            else
+                                W=W*zeros(size(mps_var.data{m}{1,1}));
+                            end
+                        end
                     else
-                        N_R=1;
-                    end
-                    
-                    if m ==1
-                        W=mps_cpn.data{m}{mps_cpn.d,N_R};
-                    else
-                        W=W*mps_cpn.data{m}{mps_cpn.d,N_R};
+                        if m==1
+                            W=zeros(size(mps_var.data{m}{1,1}));
+                        else
+                            W=W*zeros(size(mps_var.data{m}{1,1}));
+                        end
                     end
                 end
                 W_TEBD(n)=W;
@@ -2220,9 +2183,9 @@ classdef mps_cpn
             
             Total_error=0;
             for c = 1:order
-                H=H.Eff_Time_Evolve(dt,mps_cpn.RK_Roots(c));
+                H_temp=H.Eff_Time_Evolve(dt,mps_cpn.RK_Roots(c));
                 
-                mps_cpn = mps_cpn.Apply_MPO(H);
+                mps_cpn = mps_cpn.Apply_MPO(H_temp);
                 
                 % Truncate and Canonicalise
                 [mps_cpn,error] = Canonicalisation_2s(mps_cpn,'L-R');
@@ -2248,9 +2211,9 @@ classdef mps_cpn
                 for a_count = 1:k1
                     for b_count = 1:k2
                         if all(all(H.data{m}{a_count,b_count}==0))
-                            Store{a_count,b_count}=cell2mat(cellfun(@(x,y) x.*y, mps_cpn.data{m},temp_Zeros, 'UniformOutput', false));
+                            Store(((a_count-1)*a+1):a*a_count,((b_count-1)*g+1):g*b_count)=temp_Zeros;
                         elseif all(all(H.data{m}{a_count,b_count}==1))
-                            Store{a_count,b_count}=cell2mat(mps_cpn.data{m});
+                            Store(((a_count-1)*a+1):a*a_count,((b_count-1)*g+1):g*b_count)=mps_cpn.data{m};
                         else
                             O=H.data{m}{a_count,b_count};
                             
@@ -2264,38 +2227,51 @@ classdef mps_cpn
                                 end
                             end
                             
-                            if H.N_track{m}{b_count}==1
+                            if H.N_track{m}{a_count,b_count}(2)==1
                                 m_temp = cell(a,g);
                                 for m1 = 2:g
                                     m_temp(:,m1) = temp(:,m1-1);
                                 end
                                 m_temp(cellfun(@isempty,m_temp)) = {zeros(alpha,beta)};
                                 temp = m_temp;
-                            elseif H.N_track{m}{b_count}==-1
+                            elseif H.N_track{m}{a_count,b_count}(2)==-1
                                 m_temp = cell(a,g);
                                 for m1 = 1:g-1
                                     m_temp(:,m1) = temp(:,m1+1);
                                 end
                                 m_temp(cellfun(@isempty,m_temp)) = {zeros(alpha,beta)};
                                 temp=m_temp;
+                            else
+                                temp_E = cell(a,g);
+                                for k = 1:a
+                                    track=1;
+                                    for k_2 = (mps_cpn.N+1-k+1):-1:1
+                                        if k_2 <= g
+                                            temp_E{k,k_2} = eye(alpha);
+                                        end
+                                        track=track+1;
+                                    end
+                                end
+                                temp_E(cellfun(@isempty,temp_E)) = {zeros(alpha,alpha)};
+                                temp=cellfun(@(x,y) x*y,temp_E,temp,'UniformOutput', false);
                             end
+                            Store(((a_count-1)*a+1):a*a_count,((b_count-1)*g+1):g*b_count)=temp;
                             
-                            Store{a_count,b_count}=cell2mat(temp);
                         end
                         
                     end
                 end
                 
-                Store = cell2mat(Store);
-                % Store == (k1,d,alpha),(k2,NR,beta)
-                Mat = reshape(Store,alpha,mps_cpn.d,k1,beta,NR,k2); %alpha,d,k1,beta,NR,k2
-                Mat = permute(Mat,[1 3 4 6 2 5]); %alpha,k1,beta,k2,d,NR
-                Mat = reshape(Mat,alpha*k1,beta*k2,mps_cpn.d,NR); %(k1 alpha),(k2 beta),d,NR
+                % Store == (k1 d),(k2 NR)
+                
+                Mat=reshape(Store,mps_cpn.d,k1,NR,k2); % d,k1,Nr,k2
+                Mat=permute(Mat,[2 1 4 3]); %k1,d,k2,Nr
+                Mat=reshape(Mat,k1*mps_cpn.d,k2*NR); %(d k1),(NR k2)
                 
                 temp = cell(mps_cpn.d,NR);
                 for count = 1:mps_cpn.d
                     for Num_r = max(1,(g-Nl-count+2)):max(1,min(g,mps_cpn.N+1-count+1))
-                        temp(count,Num_r) = {Mat(:,:,count,Num_r)};
+                        temp{count,Num_r} = cell2mat(Mat(((count-1)*k1+1):count*k1,((Num_r-1)*k2+1):Num_r*k2));
                     end
                 end
                 temp(cellfun(@isempty,temp)) = {zeros(alpha*k1,beta*k2)};
@@ -2316,11 +2292,19 @@ classdef mps_cpn
                  Nl = min((mps_cpn.d-1)*(m-1)+1,mps_cpn.N+1);
                  [alpha,beta] = size(mps_cpn.data{m}{1,1});
                  
-                 BL = max(alpha,Bond_Dim);
-                 BR = max(beta,Bond_Dim);
+                 if m==1
+                     BL=1;
+                 else
+                     BL = max(alpha,Bond_Dim);
+                 end
+                 if m==M
+                     BR=1;
+                 else
+                     BR = max(beta,Bond_Dim);
+                 end
                  
                  for count = 1:mps_cpn.d
-                     for Num_r = max(1,(g-Nl-count+2)):max(1,min(g,mps_cpn.N+1-count+1))
+                     for Num_r = 1:g
                          temp = mps_cpn.data{m}{count,Num_r};
                          temp(:,beta+1:BR) = zeros(alpha,length(beta+1:BR));
                          temp(alpha+1:BL,:) = zeros(length(alpha+1:BL),BR);
@@ -2330,30 +2314,8 @@ classdef mps_cpn
                  
              end
             
-        end
-        
-        function mps_cpn = DMRG(mps_cpn,H,Sweeps)
-            % Apply DMRG procedure
-            
-            M = size(mps_cpn.data,2);
-            
-            %%%%%%%%%%%%%%%%%%%%%%%
-            % Calculate Initial Left Effective Hamiltonian
-            %%%%%%%%%%%%%%%%%%%%%%%
-            L = cell(1,M);
-            L{1} = 1;
-            for m = 1:(M-1)
-                L{m+1} = mps_cpn.Add_Left_Eff_Ham(H,L{m},m+1);
-            end
-            
-        end
-        
-        function mps_cpn = Add_Left_Eff_Ham(mps_cpn,H,L,m)
-            
-%             [k1,k2] = size(H.data,
-            
-        end
-
+        end        
+     
     end
     
 end

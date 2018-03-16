@@ -1,10 +1,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  MPS Ground State Calculation from Product State
-%%  Using Runga-Kutta like algorithm for time evolution.
+%%  Using MPO-TDVP algorithm.
 %%  - With particle number conservation
 %%
-%%  [1] - Juan Jos» GarcÃa-Ripoll, 'Time evolution of Matrix Product States'
-%%  IOP, (2006)
 %%
 %%  N Identical Bosons in an M Site Lattice
 %%
@@ -17,24 +15,24 @@ addpath('../Kernel/');
 M=6; % Number of lattice sites
 N =3;% Total number of particles
 N_max =3; % Maximum number of particles allowed per site
+Bond_Dimension=10; % Maximum mps Bond Dimension
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Create initial state
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-state=mps_cpn(M,1,N,N_max);
+state=mps_var(M,Bond_Dimension,N,N_max);
 %%%%%%%%%%%%%%%%%%%
 % Define Initial Particle Distribution. Vector length must be the same as
 % the number of particles. If this step is not done, the algorithm uses a
 % random distribution instead.
-state=state.set_Particle_Position([2,2,3,3,4,4]); 
+state=state.set_Particle_Position([2,2,4]); 
 %%%%%%%%%%%%%%%%%%%
-state=state.set_rand_product_state;
-state=state.set_bond_dim(1); % Change bond dimension
-% [state,Total_error] = state.Canonicalisation_2s('L-R');
+state=state.set_rand_product_state_for_Variational_Algorithms(Bond_Dimension);
+state = state.Canonicalise_1s('R-L','false');
 
 % Check Normalisation
-Check_Norm = state.Full_Norm;
+Check_Norm_In = state.Full_Norm;
 
 % Find initial particle distribution
 Num_2 = zeros(1,M);
@@ -43,51 +41,27 @@ for site = 1:M
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Runga-Kutta (imaginary) time-evolution
+%% TDVP Ground State Calc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % Generate MPO Hamiltonian 
-J=1; U=0; E=0*ones(M,1); u_chem=0;
+J=1; U=10; E=0*ones(M,1); u_chem=0;
 H=mpo_cpn(M,N_max);
 H=H.Simple_1D_Nearest(J,U,E-u_chem);
 % J=-1;Jdash=-sqrt(2);
 % H=H.SawTooth_1D(J,Jdash,U,E-u_chem);
 
-% Time-evolution parameters
-dt = 0.1;
+% Increase Maximum bond dimension. Adds Zeros to the MPS entries.
+% Bond_Dim = 50;
+% state=state.Increase_bond_dim(Bond_Dim); 
+
+% Time Evolution Parameters
 T=1;
-time_steps=abs(T/dt);
+dt=0.1;
 
-% Choose Maximum bond dimension. The MPS in the future will be truncated to
-% this value. This routine will not immediately change the size of the
-% tensors, but allow the tensors to naturally grow to this value.
-truncation = 20;
-state=state.set_bond_dim(truncation); 
+state=state.TDVP_2s(H,dt,T,'false');
 
-% Set vector containing roots of exp(-i*dt*H).
-order = 20;
-state = state.Set_Runga_Kutta_Order(order);
-
-for tt = 1:time_steps
-    tic
-    
-    [state,Error]=state.Runga_Kutta_Time_Evolve(H,dt);
-    
-    % Check Normalisation
-    Check_Norm = state.Full_Norm;
-    
-    % Particle Number
-    Num=0;
-    for site = 1:M
-        Num = Num+state.Site_Site_Particle_Corr(site,site);
-    end
-    
-    disp(['step #' num2str(tt)...
-        ' -- time=' num2str((tt)*dt)...
-        ' -- cpu time=' num2str(toc)...
-        ': P_Num=' num2str(Num)...
-        ': Truncation Error=',num2str(Error)]);
-end
+% Check Normalisation
+Check_Norm = state.Full_Norm;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Plot Observables
@@ -110,5 +84,4 @@ for site = 1:M
 end
 state.plot_Corr(Num);
 title(['TEBD Site Population: J=',num2str(J),'; U=',num2str(U),'       '],'fontsize',20);
-
 
