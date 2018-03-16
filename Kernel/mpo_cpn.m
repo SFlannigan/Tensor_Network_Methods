@@ -80,14 +80,19 @@ classdef mpo_cpn
             %       will multiply an annhilation operator, thus decreasing
             %       the number to the right again, leaving the MPS of this
             %       entry the same.
-            mpo_cpn.N_track{1} = [{0},{-1},{1},{0}];
+            
+            %[delta_NL,delta_NR]
+            mpo_cpn.N_track{1} = [{[0,0]},{[0,-1]},{[0,1]},{[0,0]}];
             
             mpo_cpn.data{M} = [{1};{b};{b_dag};{(E(M)*Num_0 + U/2 * Num_0*(Num_0-id))}];
-            mpo_cpn.N_track{M} = [{0}];
+            mpo_cpn.N_track{M} = [{[0,0]};{[1,0]};{[-1,0]};{[0,0]}];
             
             for m = 2:(M-1)
                 mpo_cpn.data{m} = [{1},{Z},{Z},{Z};{b},{Z},{Z},{Z};{b_dag},{Z},{Z},{Z};{(E(m)*Num_0 + U/2 * Num_0*(Num_0-id))},{-J*b_dag},{-J*b},{1}];
-                mpo_cpn.N_track{m} = [{0},{-1},{1},{0}];
+                mpo_cpn.N_track{m} = [{[0,0]},{[]},{[]},{[]};...
+                    {[1,0]},{[]},{[]},{[]};...
+                    {[-1,0]},{[]},{[]},{[]};...
+                    {[0,0]},{[0,-1]},{[0,1]},{[0,0]}];
             end
             
         end
@@ -103,7 +108,7 @@ classdef mpo_cpn
             Num_0 = b_dag*b; id = eye(mpo_cpn.d); Z = zeros(mpo_cpn.d);
             
             mpo_cpn.data{1} = [{(E(1)*Num_0 + U/2*Num_0*(Num_0-id))},{-J*b_dag},{-J*b},{id}];
-            mpo_cpn.N_track{1} = [{0},{-1},{1},{0}];
+            mpo_cpn.N_track{1} = [{[0,0]},{[0,-1]},{[0,1]},{[0,0]}];
             
             mpo_cpn.data{2} = [{id},{Z},{Z},{Z},{Z},{Z};{b},{Z},{Z},{Z},{J_2/J*id},{Z};{b_dag},{Z},{Z},{Z},{Z},{J_2/J*id};{(E(m)*Num_0 + U/2 * Num_0*(Num_0-id))},{-J*b_dag},{-J*b},{Z},{Z},{id}];
             mpo_cpn.N_track{2} = [{0},{-1},{1},{-1},{1},{0}];
@@ -141,7 +146,7 @@ classdef mpo_cpn
             
         end
         
-        function mpo_cpn=SawTooth_1D(mpo_cpn,J,U,E)
+        function mpo_cpn=SawTooth_1D(mpo_cpn,J,Jdash,U,E)
             % Create MPO for a 1D SawTooth lattice.
             % 
             %                       A   A   A
@@ -156,19 +161,33 @@ classdef mpo_cpn
             b = sqrt(diag(1:N_max,1)); b_dag = sqrt(diag(1:N_max,-1));
             Num_0 = b_dag*b; id = eye(mpo_cpn.d); Z = zeros(mpo_cpn.d);
             
-            mpo_cpn.data{1} = [{(E(1)*Num_0 + U/2*Num_0*(Num_0-id))},{-J*b_dag},{-J*b},{id}];
-            mpo_cpn.N_track{1} = [{0},{-1},{1},{0}];
+            mpo_cpn.data{1} = [{(E(1)*Num_0 + U/2*Num_0*(Num_0-id))},{-Jdash*b_dag},{-Jdash*b},{id}];
+            mpo_cpn.N_track{1} = [{[0,0]},{[0,-1]},{[0,1]},{[0,0]}];
             
             mpo_cpn.data{M} = [{id};{b};{b_dag};{(E(M)*Num_0 + U/2 * Num_0*(Num_0-id))}];
-            mpo_cpn.N_track{M} = [{0}];
+            mpo_cpn.N_track{M} = [{[0,0]};{[1,0]};{[-1,0]};{[0,0]}];
             
             for m = 2:(M-1)
                 if (floor(m/2)-m/2)==0
-                    mpo_cpn.data{m} = [{id},{Z},{Z},{Z};{b},{Jdash/J*id},{Z},{Z};{b_dag},{Z},{Jdash/J*id},{Z};{(E(m)*Num_0 + U/2 * Num_0*(Num_0-id))},{-J*b_dag},{-J*b},{id}];
+                    mpo_cpn.data{m} = [{id},{Z},{Z},{Z};...
+                        {b},{J/Jdash*id},{Z},{Z};...
+                        {b_dag},{Z},{J/Jdash*id},{Z};...
+                        {(E(m)*Num_0 + U/2 * Num_0*(Num_0-id))},{-Jdash*b_dag},{-Jdash*b},{id}];
+                    mpo_cpn.N_track{m} = [{[0,0]},{[]},{[]},{[]};...
+                    {[1,0]},{[1,-1]},{[]},{[]};...
+                    {[-1,0]},{[]},{[-1,1]},{[]};...
+                    {[0,0]},{[0,-1]},{[0,1]},{[0,0]}];
                 else
-                    mpo_cpn.data{m} = [{id},{Z},{Z},{Z};{b},{Z},{Z},{Z};{b_dag},{Z},{Z},{Z};{(E(m)*Num_0 + U/2 * Num_0*(Num_0-id))},{-J*b_dag},{-J*b},{id}];
+                    mpo_cpn.data{m} = [{id},{Z},{Z},{Z};...
+                        {b},{Z},{Z},{Z};...
+                        {b_dag},{Z},{Z},{Z};...
+                        {(E(m)*Num_0 + U/2 * Num_0*(Num_0-id))},{-Jdash*b_dag},{-Jdash*b},{id}];
+                    mpo_cpn.N_track{m} = [{[0,0]},{[]},{[]},{[]};...
+                    {[1,0]},{[]},{[]},{[]};...
+                    {[-1,0]},{[]},{[]},{[]};...
+                    {[0,0]},{[0,-1]},{[0,1]},{[0,0]}];
                 end
-                mpo_cpn.N_track{m} = [{0},{-1},{1},{0}];
+                
             end
             
         end
@@ -225,12 +244,30 @@ classdef mpo_cpn
             for m = 1:M
                 [alpha,beta]=size(mpo_cpn.data{m});
                 
-                mpo_cpn.data{m}{alpha,1} = mpo_cpn.data{m}{alpha,1}*(-1i*dt) - id*r/M;
+                mpo_cpn.data{m}{alpha,1} = mpo_cpn.data{m}{alpha,1}*(1i*dt) + id*r/M;
                 for count = 2:(beta-1)
-                    mpo_cpn.data{m}{alpha,count}=-1i*dt*mpo_cpn.data{m}{alpha,count};
+                    mpo_cpn.data{m}{alpha,count}=1i*dt*mpo_cpn.data{m}{alpha,count};
                 end
             end
 
+        end
+        
+        function mpo_cpn=Trial(mpo_cpn,site)
+            M = size(mpo_cpn.data,2);
+            N_max = mpo_cpn.d-1;
+            b = sqrt(diag(1:N_max,1)); b_dag = sqrt(diag(1:N_max,-1));
+            for m = 1:M
+               if m == site
+                   mpo_cpn.data{m}{1,1}=b;
+                   mpo_cpn.N_track{m}={1};
+               elseif m ==site+1
+                   mpo_cpn.data{m}{1,1}=b_dag;
+                   mpo_cpn.N_track{m}={0};
+               else
+                   mpo_cpn.data{m}{1,1}=eye(N_max+1);
+                   mpo_cpn.N_track{m}={0};
+               end
+            end
         end
         
     end

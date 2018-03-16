@@ -18,7 +18,7 @@ addpath('../Kernel/E_D');
 time_steps=floor(T/abs(dt));
 
 B = Basis_set(N,M);
-H = Onsite_Ham(B,E)+Hop_Ham(B,J,J,'Edge')+Int_Ham(B,U*ones(1,M),U*ones(1,M));
+H = Onsite_Ham(B,E)+Hop_Ham_SawTooth(B,J,Jdash)+Int_Ham(B,U*ones(1,M),U*ones(1,M));
 
 P_Dist = state.P_Positions;
 B_Check = zeros(1,size(B,2));

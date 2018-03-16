@@ -1,7 +1,8 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%  MPS Ground State Calculation from Product State
-%%  Using Imaginary time evolution algorithm (TEBD)
+%%  Using MPO-TDVP algorithm.
 %%  - With particle number conservation
+%%
 %%
 %%  N Identical Bosons in an M Site Lattice
 %%
@@ -12,26 +13,26 @@ addpath('../Kernel/');
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Lattice parameters
 M=6; % Number of lattice sites
-N=6;% Total number of particles
-N_max=N; % Maximum number of particles allowed per site
+N =3;% Total number of particles
+N_max =3; % Maximum number of particles allowed per site
+Bond_Dimension=5; % Maximum mps Bond Dimension
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Create initial state
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-state=mps_cpn(M,1,N,N_max);
+state=mps_var(M,Bond_Dimension,N,N_max);
 %%%%%%%%%%%%%%%%%%%
 % Define Initial Particle Distribution. Vector length must be the same as
 % the number of particles. If this step is not done, the algorithm uses a
 % random distribution instead.
-state=state.set_Particle_Position([2,3,3,4,1,5]); 
+state=state.set_Particle_Position([2,2,4]); 
 %%%%%%%%%%%%%%%%%%%
-state=state.set_rand_product_state;
-state=state.set_bond_dim(1); % Change bond dimension
-[state,Total_error] = state.Canonicalisation_2s('L-R');
+state=state.set_rand_product_state_for_Variational_Algorithms(Bond_Dimension);
+state = state.Canonicalise_1s('R-L','false');
 
 % Check Normalisation
-Check_Norm = state.Full_Norm;
+Check_Norm_In = state.Full_Norm;
 
 % Find initial particle distribution
 Num_2 = zeros(1,M);
@@ -40,55 +41,27 @@ for site = 1:M
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% TEBD (imaginary) time-evolution
+%% TDVP Ground State Calc
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Generate 2-site Hamiltonian 
+% Generate MPO Hamiltonian 
 J=1; U=1; E=0*ones(M,1); u_chem=0;
+H=mpo_cpn(M,N_max);
+H=H.Simple_1D_Nearest(J,U,E-u_chem);
 
-% Time-evolution parameters
-dt = 0.05;
-T=2;
-time_steps=abs(T/dt);
+% Increase Maximum bond dimension. Adds Zeros to the MPS entries.
+% Bond_Dim = 50;
+% state=state.Increase_bond_dim(Bond_Dim); 
 
-% Choose Maximum bond dimension. The MPS in the future will be truncated to
-% this value. This routine will not immediately change the size of the
-% tensors, but allow the tensors to naturally grow to this value.
-truncation = 10;
-state=state.set_bond_dim(truncation); 
+% Time Evolution Parameters
+T=0.1;
+dt=0.01;
 
-% Set vector containing Suzuki-Trotter time steps for TEBD time evolution.
-% Only 4th order currently available.
-order = 4;
-state = state.set_Suzuki_Trotter_order(order);
+state=state.TDVP(H,dt,T);
 
-Error=0;
-for tt = 1:time_steps
-    tic
-    
-    [state,Total_error]=state.TEBD_Local_2s_Gates(dt,J,U,E);
-    Error = Error + Total_error;
-    
-    % Check Normalisation
-    Check_Norm = state.Full_Norm;
-    
-    % Particle Number
-    Num=0;
-    for site = 1:M
-        Num = Num+state.Site_Site_Particle_Corr(site,site);
-    end
-    
-%     Energy = state.Get_Energy_2s(J,U,E);
-%     Var = state.Get_Var_2s(J,U,E);
-%   ' -- Variance=' num2str(Var)...
-%         ' -- Energy=' num2str(Energy)...
-    
-    disp(['step #' num2str(tt)...
-        ' -- time=' num2str((tt)*dt)...
-        ' -- cpu time=' num2str(toc)...
-        ': P_Num=' num2str(Num)...
-        ': Truncation Error=',num2str(Error)]);
-end
+% Check Normalisation
+Check_Norm = state.Full_Norm;
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Plot Observables
@@ -111,5 +84,4 @@ for site = 1:M
 end
 state.plot_Corr(Num);
 title(['TEBD Site Population: J=',num2str(J),'; U=',num2str(U),'       '],'fontsize',20);
-
 

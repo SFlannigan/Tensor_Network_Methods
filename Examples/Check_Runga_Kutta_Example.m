@@ -11,12 +11,13 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 clear;clc;close all
 addpath('../Kernel/');
+addpath('../Kernel/E_D');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Lattice parameters
-M=6; % Number of lattice sites
-N =3;% Total number of particles
-N_max =3; % Maximum number of particles allowed per site
+M=4; % Number of lattice sites
+N =2;% Total number of particles
+N_max =N; % Maximum number of particles allowed per site
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -27,11 +28,11 @@ state=mps_cpn(M,1,N,N_max);
 % Define Initial Particle Distribution. Vector length must be the same as
 % the number of particles. If this step is not done, the algorithm uses a
 % random distribution instead.
-state=state.set_Particle_Position([2,2,3,3,4,4]); 
+state=state.set_Particle_Position([2,3]); 
 %%%%%%%%%%%%%%%%%%%
 state=state.set_rand_product_state;
 state=state.set_bond_dim(1); % Change bond dimension
-% [state,Total_error] = state.Canonicalisation_2s('L-R');
+[state,Total_error] = state.Canonicalisation_2s('L-R');
 
 % Check Normalisation
 Check_Norm = state.Full_Norm;
@@ -42,73 +43,46 @@ for site = 1:M
     Num_2(site) = state.Site_Site_Particle_Corr(site,site);
 end
 
+B = Basis_set(N,M);
+W_In=state.Calc_State_Vector(B);
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Runga-Kutta (imaginary) time-evolution
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Generate MPO Hamiltonian 
-J=1; U=0; E=0*ones(M,1); u_chem=0;
+% Generate Trial MPO Hamiltonian 
 H=mpo_cpn(M,N_max);
-H=H.Simple_1D_Nearest(J,U,E-u_chem);
-% J=-1;Jdash=-sqrt(2);
-% H=H.SawTooth_1D(J,Jdash,U,E-u_chem);
+
+% Trial Hopping between site and site+1
+site=2;
+H=H.Trial(site);
 
 % Time-evolution parameters
-dt = 0.1;
+dt = 1;
 T=1;
 time_steps=abs(T/dt);
 
 % Choose Maximum bond dimension. The MPS in the future will be truncated to
 % this value. This routine will not immediately change the size of the
 % tensors, but allow the tensors to naturally grow to this value.
-truncation = 20;
+truncation = 10;
 state=state.set_bond_dim(truncation); 
 
-% Set vector containing roots of exp(-i*dt*H).
-order = 20;
-state = state.Set_Runga_Kutta_Order(order);
+state = state.Apply_MPO(H);
+                
+% Truncate and Canonicalise
+% [state,error] = Canonicalisation_2s(state,'L-R');
 
-for tt = 1:time_steps
-    tic
-    
-    [state,Error]=state.Runga_Kutta_Time_Evolve(H,dt);
-    
-    % Check Normalisation
-    Check_Norm = state.Full_Norm;
-    
-    % Particle Number
-    Num=0;
-    for site = 1:M
-        Num = Num+state.Site_Site_Particle_Corr(site,site);
-    end
-    
-    disp(['step #' num2str(tt)...
-        ' -- time=' num2str((tt)*dt)...
-        ' -- cpu time=' num2str(toc)...
-        ': P_Num=' num2str(Num)...
-        ': Truncation Error=',num2str(Error)]);
-end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%% Plot Observables
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+W_out=state.Calc_State_Vector(B);
 
-% Find particle site-site correlation function
-Corr = zeros(M,M);
-for site1 = 1:M
-    for site2 = 1:M
-        Corr(site1,site2) = state.Site_Site_Particle_Corr(site1,site2);
-    end
-end
-state.plot_Corr(Corr);
-title(['TEBD Site-Site Correlation Function: J=',num2str(J),'; U=',num2str(U),'       '],'fontsize',20);
+% Check Normalisation
+Check_Norm = state.Full_Norm;
 
-% Find particle site population function
-Num = zeros(1,M);
+% Particle Number
+Num=zeros(1,M);
 for site = 1:M
     Num(site) = state.Site_Site_Particle_Corr(site,site);
 end
-state.plot_Corr(Num);
-title(['TEBD Site Population: J=',num2str(J),'; U=',num2str(U),'       '],'fontsize',20);
 
 
